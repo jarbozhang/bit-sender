@@ -17,16 +17,16 @@ const PacketEditor = () => {
   const headerFields = proto.fields.filter(f => f.key !== 'data');
 
   return (
-    <div>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
       <div className="mb-4 flex items-center gap-4">
-        <label className="font-medium">协议类型：</label>
+        <label className="font-medium text-gray-700 dark:text-gray-300">协议类型：</label>
         <select
-          className="border rounded px-2 py-1"
+          className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
           value={proto.key}
           onChange={handleProtoChange}
         >
           {PROTOCOLS.map((p) => (
-            <option key={p.key} value={p.key}>
+            <option key={p.key} value={p.key} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
               {p.name}
             </option>
           ))}
@@ -36,9 +36,9 @@ const PacketEditor = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {headerFields.map((f) => (
           <div key={f.key} className="flex flex-col gap-1">
-            <label className="font-medium">{f.label}</label>
+            <label className="font-medium text-gray-700 dark:text-gray-300">{f.label}</label>
             <input
-              className="border rounded px-2 py-1"
+              className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
               type={f.type}
               placeholder={f.placeholder}
               value={fields[f.key] || ""}
@@ -52,15 +52,15 @@ const PacketEditor = () => {
                 }
               }}
             />
-            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
               <span>规则：</span>
               <select
-                className="border rounded px-1 py-0.5"
+                className="border rounded px-1 py-0.5 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                 value={rules[f.key] || "fixed"}
                 onChange={(e) => handleRuleChange(f.key, e.target.value)}
               >
                 {RULES.map((r) => (
-                  <option key={r.value} value={r.value}>
+                  <option key={r.value} value={r.value} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
                     {r.label}
                   </option>
                 ))}
@@ -72,9 +72,9 @@ const PacketEditor = () => {
 
       {dataField && (
         <div className="mt-4">
-          <label className="font-medium">{dataField.label}</label>
+          <label className="font-medium text-gray-700 dark:text-gray-300">{dataField.label}</label>
           <textarea
-            className="border rounded px-2 py-1 mt-1 w-full font-mono text-sm"
+            className="border rounded px-2 py-1 mt-1 w-full font-mono text-sm bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
             rows="5"
             placeholder={dataField.placeholder}
             value={fields.data || ""}
@@ -87,9 +87,9 @@ const PacketEditor = () => {
       )}
 
       <div className="mt-6">
-        <label className="font-medium">报文内容预览（16进制）</label>
-        <pre className="bg-gray-100 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words">
-          {hexPreview(fields, proto) || <span className="text-gray-400">请填写字段以预览报文内容</span>}
+        <label className="font-medium text-gray-700 dark:text-gray-300">报文内容预览（16进制）</label>
+        <pre className="bg-gray-100 dark:bg-gray-900 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
+          {hexPreview(fields, proto) || <span className="text-gray-500">请填写字段以预览报文内容</span>}
         </pre>
       </div>
     </div>
