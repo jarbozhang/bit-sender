@@ -6,6 +6,7 @@ export const PROTOCOLS = [
       { label: "目的MAC地址", key: "dstMac", type: "text", placeholder: "AA:BB:CC:DD:EE:FF", maxLength: 12 },
       { label: "源MAC地址", key: "srcMac", type: "text", placeholder: "00:11:22:33:44:55", maxLength: 12 },
       { label: "类型", key: "type", type: "text", placeholder: "0x0800", maxLength: 4 },
+      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
     ],
   },
   {
@@ -19,6 +20,7 @@ export const PROTOCOLS = [
       { label: "发送方IP", key: "srcIp", type: "text", placeholder: "192.168.1.1", maxLength: 15 },
       { label: "目标MAC", key: "dstMac", type: "text", placeholder: "AA:BB:CC:DD:EE:FF", maxLength: 17 },
       { label: "目标IP", key: "dstIp", type: "text", placeholder: "192.168.1.2", maxLength: 15 },
+      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
     ],
   },
   {
@@ -29,6 +31,7 @@ export const PROTOCOLS = [
       { label: "目的IP地址", key: "dstIp", type: "text", placeholder: "192.168.1.2", maxLength: 15 },
       { label: "协议", key: "protocol", type: "number", placeholder: "6 (TCP)", maxLength: 3 },
       { label: "TTL", key: "ttl", type: "number", placeholder: "64", maxLength: 3 },
+      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
     ],
   },
   {
@@ -37,7 +40,7 @@ export const PROTOCOLS = [
     fields: [
       { label: "源端口", key: "srcPort", type: "number", placeholder: "12345", maxLength: 5 },
       { label: "目的端口", key: "dstPort", type: "number", placeholder: "80", maxLength: 5 },
-      { label: "数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
+      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
     ],
   },
   {
@@ -48,7 +51,7 @@ export const PROTOCOLS = [
       { label: "目的端口", key: "dstPort", type: "number", placeholder: "80", maxLength: 5 },
       { label: "序列号", key: "seq", type: "number", placeholder: "0", maxLength: 10 },
       { label: "确认号", key: "ack", type: "number", placeholder: "0", maxLength: 10 },
-      { label: "数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
+      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
     ],
   },
 ];

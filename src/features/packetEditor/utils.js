@@ -1,73 +1,86 @@
-export function hexPreview(obj, protoFields) {
-  return protoFields
-    .map((f) => {
-      const k = f.key;
-      const v = obj[k];
-      // MAC 地址特殊处理
-      if (k.toLowerCase().includes("mac") && typeof v === "string") {
-        if (v.includes(":")) {
-          // 冒号分隔
-          return v
-            .split(":")
-            .map((seg) => {
-              const num = parseInt(seg, 16);
-              return isNaN(num) ? "??" : seg.toUpperCase().padStart(2, "0");
-            })
-            .join(" ");
-        } else if (/^[0-9a-fA-F]+$/.test(v)) {
-          // 任意长度的16进制字符串
-          return v
-            .replace(/[^0-9a-fA-F]/g, "")
-            .toUpperCase()
-            .match(/.{1,2}/g)
-            .join(" ");
-        } else {
-          return "??";
-        }
-      }
-      // type 字段特殊处理
-      if (k.toLowerCase() === "type" && typeof v === "string") {
-        let hex = v.replace(/^0x/i, "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
-        if (hex.length % 2 !== 0) hex = "0" + hex;
-        return hex.match(/.{1,2}/g)?.join(" ") || "";
-      }
-      // IP 地址格式化
-      if (k.toLowerCase().includes("ip") && typeof v === "string") {
-        if (v.includes(".")) {
-          // 点分十进制
-          return v
-            .split(".")
-            .map(seg => {
-              const num = parseInt(seg, 10);
-              return isNaN(num) ? "??" : num.toString(16).toUpperCase().padStart(2, "0");
-            })
-            .join(" ");
-        } else if (/^[0-9a-fA-F]+$/.test(v)) {
-          // 连续8位16进制字符串
-          return v
-            .replace(/[^0-9a-fA-F]/g, "")
-            .toUpperCase()
-            .match(/.{1,2}/g)
-            .join(" ");
-        } else {
-          return "??";
-        }
-      }
-      // 端口、TTL、协议等数字字段
-      if (["port", "ttl", "protocol", "seq", "ack", "opcode", "hwtype"].some(fx => k.toLowerCase().includes(fx))) {
-        if (typeof v === "number") return v.toString(16).toUpperCase().padStart(4, "0");
-        if (typeof v === "string" && v !== "") {
-          const num = parseInt(v, 10);
-          return isNaN(num) ? "??" : num.toString(16).toUpperCase().padStart(4, "0");
-        }
-      }
-      if (typeof v === "number") return v.toString(16).toUpperCase().padStart(2, "0");
-      if (typeof v === "string")
-        return v
-          .split("")
-          .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-          .join("");
-      return "";
-    })
-    .join(" ");
+function formatSingleValue(k, v) {
+  if (v === undefined || v === null || String(v).trim() === '') return null;
+
+  // MAC
+  if (k.toLowerCase().includes("mac") && typeof v === "string") {
+    if (v.includes(":")) {
+      return v.split(":").map(seg => (isNaN(parseInt(seg, 16)) ? "??" : seg.toUpperCase().padStart(2, "0"))).join(" ");
+    } else if (/^[0-9a-fA-F]+$/.test(v)) {
+      return v.replace(/[^0-9a-fA-F]/g, "").toUpperCase().match(/.{1,2}/g)?.join(" ") || "??";
+    } else {
+      return "??";
+    }
+  }
+  // Type
+  if (k.toLowerCase() === "type" && typeof v === "string") {
+    let hex = v.replace(/^0x/i, "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+    if (hex.length % 2 !== 0) hex = "0" + hex;
+    return hex.match(/.{1,2}/g)?.join(" ") || null;
+  }
+  // IP
+  if (k.toLowerCase().includes("ip") && typeof v === "string") {
+    if (v.includes(".")) {
+      return v.split(".").map(seg => (isNaN(parseInt(seg, 10)) ? "??" : parseInt(seg, 10).toString(16).toUpperCase().padStart(2, "0"))).join(" ");
+    } else if (/^[0-9a-fA-F]+$/.test(v)) {
+      return v.replace(/[^0-9a-fA-F]/g, "").toUpperCase().match(/.{1,2}/g)?.join(" ") || "??";
+    } else {
+      return "??";
+    }
+  }
+  // Multi-byte numeric fields
+  if (["port", "seq", "ack"].some(fx => k.toLowerCase().includes(fx))) {
+    const num = typeof v === 'number' ? v : parseInt(v, 10);
+    const hex = isNaN(num) ? null : num.toString(16).toUpperCase().padStart(k.toLowerCase().includes('port') ? 4 : 8, "0");
+    return hex?.match(/.{1,2}/g)?.join(" ") || null;
+  }
+  // Single-byte numeric fields
+  if (["ttl", "protocol", "opcode", "hwtype"].some(fx => k.toLowerCase().includes(fx))) {
+    const num = typeof v === 'number' ? v : parseInt(v, 10);
+    return isNaN(num) ? null : num.toString(16).toUpperCase().padStart(2, "0");
+  }
+  // Payload
+  if (typeof v === "string") {
+    return v.split("").map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).join(" ");
+  }
+  if (typeof v === "number") {
+    return v.toString(16).toUpperCase().padStart(2, "0");
+  }
+  return null;
+}
+
+export function hexPreview(obj, proto) {
+  const parts = proto.fields.map(f => {
+    const value = obj[f.key];
+    const valueToFormat = (value === undefined || value === null || String(value).trim() === '') ? f.placeholder : value;
+    if (valueToFormat === undefined || valueToFormat === null || String(valueToFormat).trim() === '') {
+      return null;
+    }
+    return formatSingleValue(f.key, valueToFormat);
+  }).filter(p => p !== null && p !== '');
+
+  let hexString = parts.join(" ");
+  hexString = hexString.replace(/\s+/g, ' ').trim();
+
+  let bytesArray = hexString === '' ? [] : hexString.split(' ');
+
+  // Pad to 64 bytes if it's an Ethernet frame
+  if (proto.key === 'ethernet') {
+    if (bytesArray.length < 64) {
+      const paddingCount = 64 - bytesArray.length;
+      const padding = Array(paddingCount).fill('00');
+      bytesArray.push(...padding);
+    }
+  }
+  
+  if (bytesArray.length === 0) {
+    return '';
+  }
+
+  // Format with newlines every 16 bytes
+  const lines = [];
+  for (let i = 0; i < bytesArray.length; i += 16) {
+    lines.push(bytesArray.slice(i, i + 16).join(' '));
+  }
+
+  return lines.join('\n');
 } 

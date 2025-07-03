@@ -13,6 +13,9 @@ const PacketEditor = () => {
     handleRuleChange,
   } = usePacketEditor();
 
+  const dataField = proto.fields.find(f => f.key === 'data');
+  const headerFields = proto.fields.filter(f => f.key !== 'data');
+
   return (
     <div>
       <div className="mb-4 flex items-center gap-4">
@@ -29,8 +32,9 @@ const PacketEditor = () => {
           ))}
         </select>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {proto.fields.map((f) => (
+        {headerFields.map((f) => (
           <div key={f.key} className="flex flex-col gap-1">
             <label className="font-medium">{f.label}</label>
             <input
@@ -39,7 +43,7 @@ const PacketEditor = () => {
               placeholder={f.placeholder}
               value={fields[f.key] || ""}
               maxLength={f.maxLength}
-              onChange={(e) => handleFieldChange(f.key, f.type === "number" ? Number(e.target.value) : e.target.value, f.maxLength)}
+              onChange={(e) => handleFieldChange(f.key, e.target.value, f.maxLength)}
               onPaste={(e) => {
                 const paste = (e.clipboardData || window.clipboardData).getData('text');
                 if (paste.length > f.maxLength) {
@@ -65,11 +69,28 @@ const PacketEditor = () => {
           </div>
         ))}
       </div>
+
+      {dataField && (
+        <div className="mt-4">
+          <label className="font-medium">{dataField.label}</label>
+          <textarea
+            className="border rounded px-2 py-1 mt-1 w-full font-mono text-sm"
+            rows="5"
+            placeholder={dataField.placeholder}
+            value={fields.data || ""}
+            maxLength={dataField.maxLength}
+            onChange={(e) =>
+              handleFieldChange(dataField.key, e.target.value, dataField.maxLength)
+            }
+          />
+        </div>
+      )}
+
       <div className="mt-6">
         <label className="font-medium">报文内容预览（16进制）</label>
-        <div className="bg-gray-100 rounded p-3 font-mono text-sm mt-2 break-all">
-          {hexPreview(fields, proto.fields) || <span className="text-gray-400">请填写字段以预览报文内容</span>}
-        </div>
+        <pre className="bg-gray-100 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words">
+          {hexPreview(fields, proto) || <span className="text-gray-400">请填写字段以预览报文内容</span>}
+        </pre>
       </div>
     </div>
   );
