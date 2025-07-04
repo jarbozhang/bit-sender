@@ -2,8 +2,6 @@
 
 ## 下载地址
 
-每次发布新版本（打 tag 后），会自动在 [GitHub Releases](../../releases) 页面生成三平台安装包：
-
 - **[Windows 下载（.msi/.exe）](../../releases/latest)**
 - **[macOS 下载（.dmg/.zip）](../../releases/latest)**
 - **[Linux 下载（.AppImage/.deb/.tar.gz）](../../releases/latest)**
@@ -14,9 +12,11 @@
 
 如果是 macOS 用户，安装完成后需要执行以下命令来移除应用的安全限制：
 
+```bash
 xattr -cr /Applications/bit-sender.app
 # 或者你下载的路径
 xattr -cr /path/to/bit-sender.app
+```
 
 
 ---
