@@ -5,6 +5,7 @@ import { usePacketEditor } from './usePacketEditor';
 import Button from '../../components/Button';
 import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
+import NetworkSelectModal from '../../components/NetworkSelectModal';
 
 const PacketEditor = () => {
   const {
@@ -19,14 +20,19 @@ const PacketEditor = () => {
   const { showSuccess, showError, showInfo } = useToast();
   const { sendPacket } = useNetwork();
   const [isTestSending, setIsTestSending] = useState(false);
+  const [showNetModal, setShowNetModal] = useState(false);
+  const [selectedInterface, setSelectedInterface] = useState(null);
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
 
   const handleTestSend = async () => {
+    setShowNetModal(true);
+  };
+
+  const doTestSend = async (iface) => {
     setIsTestSending(true);
     try {
-      // 构建报文数据，未填写的字段用 placeholder 补全
       const completeFields = {};
       proto.fields.forEach(f => {
         completeFields[f.key] = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
@@ -36,9 +42,9 @@ const PacketEditor = () => {
       const packetData = {
         protocol: proto.key,
         fields: completeFields,
-        payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
+        payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null,
+        interface: iface
       };
-
       const result = await sendPacket(packetData);
       showSuccess(result.message);
     } catch (error) {
@@ -152,6 +158,18 @@ const PacketEditor = () => {
           </Button>
         </div>
       </div>
+
+      <NetworkSelectModal
+        visible={showNetModal}
+        onClose={() => setShowNetModal(false)}
+        onSelect={(iface) => {
+          setShowNetModal(false);
+          if (iface) {
+            setSelectedInterface(iface);
+            doTestSend(iface);
+          }
+        }}
+      />
     </div>
   );
 };
