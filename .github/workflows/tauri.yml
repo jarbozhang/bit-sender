@@ -57,8 +57,8 @@ jobs:
           name: tauri-app-${{ matrix.platform }}
           path: src-tauri/target/release/bundle/
 
-      - name: Install Python distutils (macOS/Linux)
-        if: runner.os != 'Windows'
+      - name: Install Python distutils (Linux)
+        if: runner.os == 'Linux'
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install distutils 
