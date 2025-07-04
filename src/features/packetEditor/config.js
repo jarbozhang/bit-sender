@@ -3,10 +3,10 @@ export const PROTOCOLS = [
     name: "以太网",
     key: "ethernet",
     fields: [
-      { label: "目的MAC地址", key: "dstMac", type: "text", placeholder: "AA:BB:CC:DD:EE:FF", maxLength: 12 },
-      { label: "源MAC地址", key: "srcMac", type: "text", placeholder: "00:11:22:33:44:55", maxLength: 12 },
-      { label: "类型", key: "type", type: "text", placeholder: "0x0800", maxLength: 4 },
-      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
+      { label: "目的MAC地址", key: "dst_mac", type: "text", placeholder: "AA:BB:CC:DD:EE:FF", maxLength: 17 },
+      { label: "源MAC地址", key: "src_mac", type: "text", placeholder: "00:11:22:33:44:55", maxLength: 17 },
+      { label: "类型", key: "ether_type", type: "text", placeholder: "0x0800", maxLength: 4 },
+      { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 750 },
     ],
   },
   {

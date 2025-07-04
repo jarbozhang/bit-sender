@@ -81,14 +81,12 @@ impl NetworkInterface {
         println!("报文内容: {:02X?}", packet);
         
         // 注释掉实际的发送逻辑，避免权限问题
-        /*
         let mut cap = pcap::Capture::from_device(self.device.clone())?
             .promisc(true)
             .snaplen(65535)
             .open()?;
 
         cap.sendpacket(packet)?;
-        */
         
         // 模拟发送成功
         println!("报文发送成功（模拟）");

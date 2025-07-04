@@ -35,6 +35,13 @@ export const usePacketEditor = () => {
         if (regex) {
             sanitizedValue = value.replace(regex, '');
         }
+        // 自动格式化 MAC 地址为冒号分隔
+        if (key.toLowerCase().includes('mac')) {
+            let raw = sanitizedValue.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+            if (raw.length === 12) {
+                sanitizedValue = raw.match(/.{1,2}/g).join(':');
+            }
+        }
     }
 
     // 2. Enforce maxLength
