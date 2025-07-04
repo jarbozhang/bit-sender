@@ -90,7 +90,7 @@ async fn start_batch_send(
         let mut sender = match interface_name_clone.clone() {
             Some(ref name) => match NetworkSender::open(name) {
                 Ok(s) => s,
-                Err(e) => {
+                Err(_e) => {
                     let mut s = status_clone.lock().unwrap();
                     s.running = false;
                     return;

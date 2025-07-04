@@ -9,7 +9,6 @@ use anyhow::Result;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use tokio::sync::oneshot;
-use serde_json::Value;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PacketData {
