@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
 import NetworkSelectModal from '../../components/NetworkSelectModal';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
+import BatchSendDialog from '../../components/BatchSendDialog';
 
 const PacketEditor = () => {
   const {
@@ -24,6 +25,9 @@ const PacketEditor = () => {
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const [isTested, setIsTested] = useState(false);
   const [pendingSend, setPendingSend] = useState(false);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [batchStatus, setBatchStatus] = useState(null); // mock 统计数据
+  const [batchMode, setBatchMode] = useState('setup'); // 'setup' | 'stats'
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
@@ -70,8 +74,34 @@ const PacketEditor = () => {
   }, [pendingSend, selectedInterface]);
 
   const handleBatchSend = () => {
-    // TODO: 跳转到发送与抓包页面
-    showInfo("即将跳转到发送与抓包页面...");
+    setShowBatchDialog(true);
+    setBatchMode('setup');
+  };
+
+  // 批量发送弹框确认
+  const handleBatchConfirm = (frequency) => {
+    // 不关闭弹框，切换到统计信息模式
+    setBatchMode('stats');
+    setBatchStatus({
+      startTime: new Date().toLocaleTimeString(),
+      sentCount: 0,
+      speed: frequency,
+    });
+    showInfo(`已提交批量发送任务，频率：${frequency} 次/秒`);
+  };
+
+  // 结束任务
+  const handleBatchStop = () => {
+    setBatchStatus(null);
+    setShowBatchDialog(false);
+    setBatchMode('setup');
+    showInfo('批量发送任务已结束');
+  };
+
+  // 取消弹框
+  const handleBatchCancel = () => {
+    setShowBatchDialog(false);
+    setBatchMode('setup');
   };
 
   // 编辑内容时重置测试状态
@@ -177,6 +207,13 @@ const PacketEditor = () => {
           </Button>
         </div>
       </div>
+      <BatchSendDialog
+        visible={showBatchDialog}
+        onConfirm={handleBatchConfirm}
+        onCancel={handleBatchCancel}
+        status={batchMode === 'stats' ? batchStatus : null}
+        onStop={handleBatchStop}
+      />
     </div>
   );
 };
