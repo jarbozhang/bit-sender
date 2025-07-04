@@ -27,6 +27,7 @@ jobs:
           echo "LIB=$WIN_PWD/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
           echo "INCLUDE=$WIN_PWD/npcap-sdk-1.13/Include" >> $GITHUB_ENV
           echo "PCAP_LIB_DIR=$WIN_PWD/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
+          ls "$WIN_PWD/npcap-sdk-1.13/Lib/x64/wpcap.lib"
 
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
@@ -59,6 +60,9 @@ jobs:
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          LIB: ${{ env.LIB }}
+          INCLUDE: ${{ env.INCLUDE }}
+          PCAP_LIB_DIR: ${{ env.PCAP_LIB_DIR }}
         with:
           args: --ci
 
