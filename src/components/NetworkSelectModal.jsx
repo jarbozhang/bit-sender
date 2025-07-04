@@ -72,6 +72,10 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
               key={iface.name}
               className={`flex items-center gap-4 p-2 rounded cursor-pointer ${selected === iface.name ? "bg-blue-100 dark:bg-blue-900" : ""}`}
               onClick={() => setSelected(iface.name)}
+              onDoubleClick={() => {
+                onSelect(iface.name);
+                onClose();
+              }}
             >
               <span className="w-48 text-gray-900 dark:text-gray-100">{iface.description || iface.name}</span>
               <TrafficChart data={traffic[iface.name] || []} />
