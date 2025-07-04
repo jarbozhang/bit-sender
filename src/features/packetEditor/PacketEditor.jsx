@@ -26,11 +26,17 @@ const PacketEditor = () => {
   const handleTestSend = async () => {
     setIsTestSending(true);
     try {
-      // 构建报文数据
+      // 构建报文数据，未填写的字段用 placeholder 补全
+      const completeFields = {};
+      proto.fields.forEach(f => {
+        completeFields[f.key] = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
+          ? f.placeholder
+          : fields[f.key];
+      });
       const packetData = {
         protocol: proto.key,
-        fields: { ...fields },
-        payload: fields.data || null
+        fields: completeFields,
+        payload: completeFields.data || null
       };
 
       const result = await sendPacket(packetData);

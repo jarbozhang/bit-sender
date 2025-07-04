@@ -1,4 +1,4 @@
-function formatSingleValue(k, v) {
+function formatSingleValue(k, v, protoKey) {
   if (v === undefined || v === null || String(v).trim() === '') return null;
 
   // MAC
@@ -11,8 +11,8 @@ function formatSingleValue(k, v) {
       return "??";
     }
   }
-  // Type
-  if (k.toLowerCase() === "type" && typeof v === "string") {
+  // Type/ether_type 字段，优先按 hex 处理
+  if (["type", "ether_type"].includes(k.toLowerCase()) && typeof v === "string") {
     let hex = v.replace(/^0x/i, "").replace(/[^0-9a-fA-F]/g, "").toUpperCase();
     if (hex.length % 2 !== 0) hex = "0" + hex;
     return hex.match(/.{1,2}/g)?.join(" ") || null;
@@ -38,7 +38,22 @@ function formatSingleValue(k, v) {
     const num = typeof v === 'number' ? v : parseInt(v, 10);
     return isNaN(num) ? null : num.toString(16).toUpperCase().padStart(2, "0");
   }
-  // Payload
+  // Payload/data 字段，TCP/UDP 支持字符串和十六进制，其他协议只允许十六进制，奇数位自动补零
+  if (["data", "payload"].includes(k.toLowerCase()) && typeof v === "string") {
+    if (protoKey === "tcp" || protoKey === "udp") {
+      if (/^[0-9a-fA-F]+$/.test(v) && v.length % 2 === 0) {
+        return v.match(/.{1,2}/g).map(x => x.toUpperCase()).join(" ");
+      }
+      return v.split("").map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).join(" ");
+    } else {
+      // 非 TCP/UDP，允许奇数位自动补零（右侧补零）
+      if (/^[0-9a-fA-F]+$/.test(v)) {
+        let hex = v.length % 2 === 0 ? v : v + '0';
+        return hex.match(/.{1,2}/g).map(x => x.toUpperCase()).join(" ");
+      }
+      return "??";
+    }
+  }
   if (typeof v === "string") {
     return v.split("").map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).join(" ");
   }
@@ -55,7 +70,7 @@ export function hexPreview(obj, proto) {
     if (valueToFormat === undefined || valueToFormat === null || String(valueToFormat).trim() === '') {
       return null;
     }
-    return formatSingleValue(f.key, valueToFormat);
+    return formatSingleValue(f.key, valueToFormat, proto.key);
   }).filter(p => p !== null && p !== '');
 
   let hexString = parts.join(" ");
