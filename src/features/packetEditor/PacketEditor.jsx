@@ -22,6 +22,7 @@ const PacketEditor = () => {
   const [isTestSending, setIsTestSending] = useState(false);
   const [showNetModal, setShowNetModal] = useState(false);
   const [selectedInterface, setSelectedInterface] = useState(null);
+  const [isTested, setIsTested] = useState(false);
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
@@ -46,6 +47,7 @@ const PacketEditor = () => {
       };
       const result = await sendPacket(packetData, iface);
       showSuccess(result.message);
+      setIsTested(true);
     } catch (error) {
       showError(error.message);
     } finally {
@@ -58,6 +60,20 @@ const PacketEditor = () => {
     showInfo("即将跳转到发送与抓包页面...");
   };
 
+  // 编辑内容时重置测试状态
+  const handleProtoChangeWrap = (e) => {
+    setIsTested(false);
+    handleProtoChange(e);
+  };
+  const handleFieldChangeWrap = (key, value, maxLength) => {
+    setIsTested(false);
+    handleFieldChange(key, value, maxLength);
+  };
+  const handleRuleChangeWrap = (key, value) => {
+    setIsTested(false);
+    handleRuleChange(key, value);
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
       <div className="mb-4 flex items-center gap-4">
@@ -65,7 +81,7 @@ const PacketEditor = () => {
         <select
           className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
           value={proto.key}
-          onChange={handleProtoChange}
+          onChange={handleProtoChangeWrap}
         >
           {PROTOCOLS.map((p) => (
             <option key={p.key} value={p.key} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
@@ -85,7 +101,7 @@ const PacketEditor = () => {
               placeholder={f.placeholder}
               value={fields[f.key] || ""}
               maxLength={f.maxLength}
-              onChange={(e) => handleFieldChange(f.key, e.target.value, f.maxLength)}
+              onChange={(e) => handleFieldChangeWrap(f.key, e.target.value, f.maxLength)}
               onPaste={(e) => {
                 const paste = (e.clipboardData || window.clipboardData).getData('text');
                 if (paste.length > f.maxLength) {
@@ -99,7 +115,7 @@ const PacketEditor = () => {
               <select
                 className="border rounded px-1 py-0.5 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                 value={rules[f.key] || "fixed"}
-                onChange={(e) => handleRuleChange(f.key, e.target.value)}
+                onChange={(e) => handleRuleChangeWrap(f.key, e.target.value)}
               >
                 {RULES.map((r) => (
                   <option key={r.value} value={r.value} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
@@ -121,9 +137,7 @@ const PacketEditor = () => {
             placeholder={dataField.placeholder}
             value={fields.data || ""}
             maxLength={dataField.maxLength}
-            onChange={(e) =>
-              handleFieldChange(dataField.key, e.target.value, dataField.maxLength)
-            }
+            onChange={(e) => handleFieldChangeWrap(dataField.key, e.target.value, dataField.maxLength)}
           />
         </div>
       )}
@@ -150,8 +164,14 @@ const PacketEditor = () => {
           <Button
             variant="secondary"
             size="lg"
-            onClick={handleBatchSend}
-            className="flex-1 sm:flex-none"
+            onClick={() => {
+              if (!isTested) {
+                showError("测试发送成功之后才能批量发送");
+                return;
+              }
+              handleBatchSend();
+            }}
+            className={`flex-1 sm:flex-none ${!isTested ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             批量发送
           </Button>
