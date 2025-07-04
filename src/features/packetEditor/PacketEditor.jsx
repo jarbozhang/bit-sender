@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PROTOCOLS } from './config';
 import { hexPreview } from './utils';
 import { usePacketEditor } from './usePacketEditor';
@@ -23,6 +23,7 @@ const PacketEditor = () => {
   const [isTestSending, setIsTestSending] = useState(false);
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const [isTested, setIsTested] = useState(false);
+  const [pendingSend, setPendingSend] = useState(false);
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
@@ -34,6 +35,7 @@ const PacketEditor = () => {
   const doTestSend = async () => {
     const netIf = selectedInterface;
     if (!netIf) {
+      setPendingSend(true);
       setShowSelectModal(true);
       return;
     }
@@ -59,6 +61,13 @@ const PacketEditor = () => {
       setIsTestSending(false);
     }
   };
+
+  useEffect(() => {
+    if (pendingSend && selectedInterface) {
+      setPendingSend(false);
+      doTestSend();
+    }
+  }, [pendingSend, selectedInterface]);
 
   const handleBatchSend = () => {
     // TODO: 跳转到发送与抓包页面
