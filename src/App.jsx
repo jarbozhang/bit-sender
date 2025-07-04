@@ -1,46 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import PacketEditor from "./features/packetEditor";
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useSystemTheme } from "./hooks/useSystemTheme";
-import Button from "./components/Button";
 import { ToastContainer } from "./components/Toast";
-import { useToast } from "./hooks/useToast";
-import { useNetwork } from "./hooks/useNetwork";
+import { useToast, ToastProvider } from "./contexts/ToastContext";
 
-function App() {
+function AppContent() {
   useSystemTheme();
-  const { toasts, removeToast, showSuccess, showError, showInfo } = useToast();
-  const { sendPacket } = useNetwork();
-  const [isTestSending, setIsTestSending] = useState(false);
-
-  const handleTestSend = async () => {
-    setIsTestSending(true);
-    try {
-      // 获取当前报文编辑区的数据
-      // TODO: 从 PacketEditor 组件获取当前数据
-      const packetData = {
-        protocol: "ethernet",
-        fields: {
-          dst_mac: "00:11:22:33:44:55",
-          src_mac: "AA:BB:CC:DD:EE:FF",
-          ether_type: "0800"
-        },
-        payload: "48656C6C6F20576F726C64" // "Hello World" in hex
-      };
-
-      const result = await sendPacket(packetData);
-      showSuccess(result.message);
-    } catch (error) {
-      showError(error.message);
-    } finally {
-      setIsTestSending(false);
-    }
-  };
-
-  const handleBatchSend = () => {
-    // TODO: 跳转到发送与抓包页面
-    showInfo("即将跳转到发送与抓包页面...");
-  };
+  const { toasts, removeToast } = useToast();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex flex-col text-gray-800 dark:bg-gray-900 dark:text-gray-200">
@@ -71,29 +38,6 @@ function App() {
               报文编辑
             </h2>
             <PacketEditor />
-            
-            {/* 操作按钮区域 */}
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  loading={isTestSending}
-                  onClick={handleTestSend}
-                  className="flex-1 sm:flex-none"
-                >
-                  {isTestSending ? "发送中..." : "测试发送"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={handleBatchSend}
-                  className="flex-1 sm:flex-none"
-                >
-                  批量发送
-                </Button>
-              </div>
-            </div>
           </div>
         </section>
       </main>
@@ -105,6 +49,14 @@ function App() {
       {/* Toast 通知容器 */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }
 

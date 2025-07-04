@@ -1,7 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { PROTOCOLS, RULES } from './config';
 import { hexPreview } from './utils';
 import { usePacketEditor } from './usePacketEditor';
+import Button from '../../components/Button';
+import { useToast } from '../../contexts/ToastContext';
+import { useNetwork } from '../../hooks/useNetwork';
 
 const PacketEditor = () => {
   const {
@@ -13,8 +16,36 @@ const PacketEditor = () => {
     handleRuleChange,
   } = usePacketEditor();
 
+  const { showSuccess, showError, showInfo } = useToast();
+  const { sendPacket } = useNetwork();
+  const [isTestSending, setIsTestSending] = useState(false);
+
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
+
+  const handleTestSend = async () => {
+    setIsTestSending(true);
+    try {
+      // 构建报文数据
+      const packetData = {
+        protocol: proto.key,
+        fields: { ...fields },
+        payload: fields.data || null
+      };
+
+      const result = await sendPacket(packetData);
+      showSuccess(result.message);
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      setIsTestSending(false);
+    }
+  };
+
+  const handleBatchSend = () => {
+    // TODO: 跳转到发送与抓包页面
+    showInfo("即将跳转到发送与抓包页面...");
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
@@ -91,6 +122,29 @@ const PacketEditor = () => {
         <pre className="bg-gray-100 dark:bg-gray-900 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
           {hexPreview(fields, proto) || <span className="text-gray-500">请填写字段以预览报文内容</span>}
         </pre>
+      </div>
+
+      {/* 操作按钮区域 */}
+      <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Button
+            variant="primary"
+            size="lg"
+            loading={isTestSending}
+            onClick={handleTestSend}
+            className="flex-1 sm:flex-none"
+          >
+            {isTestSending ? "发送中..." : "测试发送"}
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleBatchSend}
+            className="flex-1 sm:flex-none"
+          >
+            批量发送
+          </Button>
+        </div>
       </div>
     </div>
   );
