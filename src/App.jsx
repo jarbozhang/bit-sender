@@ -4,10 +4,12 @@ import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { ToastContainer } from "./components/Toast";
 import { useToast, ToastProvider } from "./contexts/ToastContext";
+import { NetworkInterfaceProvider, useNetworkInterface } from "./contexts/NetworkInterfaceContext";
 
 function AppContent() {
   useSystemTheme();
   const { toasts, removeToast } = useToast();
+  const { selectedInterface, setShowSelectModal } = useNetworkInterface();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex flex-col text-gray-800 dark:bg-gray-900 dark:text-gray-200">
@@ -24,6 +26,13 @@ function AppContent() {
               <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">发送与抓包</a>
               <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">配置管理</a>
             </div>
+            {/* 新增网卡选择入口 */}
+            <button
+              className="ml-4 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-blue-100 dark:hover:bg-blue-900 transition"
+              onClick={() => setShowSelectModal(true)}
+            >
+              当前网卡：{selectedInterface || "未选择"}
+            </button>
             {/* 移动端菜单可后续补充 */}
           </div>
         </div>
@@ -55,7 +64,9 @@ function AppContent() {
 function App() {
   return (
     <ToastProvider>
-      <AppContent />
+      <NetworkInterfaceProvider>
+        <AppContent />
+      </NetworkInterfaceProvider>
     </ToastProvider>
   );
 }

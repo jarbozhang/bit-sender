@@ -54,10 +54,4 @@ export const PROTOCOLS = [
       { label: "Payload / 数据", key: "data", type: "text", placeholder: "hello", maxLength: 256 },
     ],
   },
-];
-
-export const RULES = [
-  { label: "固定", value: "fixed" },
-  { label: "自增", value: "inc" },
-  { label: "自减", value: "dec" },
 ]; 

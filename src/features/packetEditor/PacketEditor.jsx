@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { PROTOCOLS, RULES } from './config';
+import { PROTOCOLS } from './config';
 import { hexPreview } from './utils';
 import { usePacketEditor } from './usePacketEditor';
 import Button from '../../components/Button';
 import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
 import NetworkSelectModal from '../../components/NetworkSelectModal';
+import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 
 const PacketEditor = () => {
   const {
@@ -20,18 +21,22 @@ const PacketEditor = () => {
   const { showSuccess, showError, showInfo } = useToast();
   const { sendPacket } = useNetwork();
   const [isTestSending, setIsTestSending] = useState(false);
-  const [showNetModal, setShowNetModal] = useState(false);
-  const [selectedInterface, setSelectedInterface] = useState(null);
+  const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const [isTested, setIsTested] = useState(false);
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
 
   const handleTestSend = async () => {
-    setShowNetModal(true);
+    doTestSend();
   };
 
-  const doTestSend = async (iface) => {
+  const doTestSend = async () => {
+    const netIf = selectedInterface;
+    if (!netIf) {
+      setShowSelectModal(true);
+      return;
+    }
     setIsTestSending(true);
     try {
       const completeFields = {};
@@ -45,7 +50,7 @@ const PacketEditor = () => {
         fields: completeFields,
         payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
       };
-      const result = await sendPacket(packetData, iface);
+      const result = await sendPacket(packetData, netIf);
       showSuccess(result.message);
       setIsTested(true);
     } catch (error) {
@@ -110,20 +115,6 @@ const PacketEditor = () => {
                 }
               }}
             />
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
-              <span>规则：</span>
-              <select
-                className="border rounded px-1 py-0.5 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                value={rules[f.key] || "fixed"}
-                onChange={(e) => handleRuleChangeWrap(f.key, e.target.value)}
-              >
-                {RULES.map((r) => (
-                  <option key={r.value} value={r.value} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         ))}
       </div>
@@ -177,18 +168,6 @@ const PacketEditor = () => {
           </Button>
         </div>
       </div>
-
-      <NetworkSelectModal
-        visible={showNetModal}
-        onClose={() => setShowNetModal(false)}
-        onSelect={(iface) => {
-          setShowNetModal(false);
-          if (iface) {
-            setSelectedInterface(iface);
-            doTestSend(iface);
-          }
-        }}
-      />
     </div>
   );
 };
