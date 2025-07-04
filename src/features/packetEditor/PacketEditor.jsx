@@ -144,7 +144,7 @@ const PacketEditor = () => {
       <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button
-            variant="primary"
+            variant={isTested ? "secondary" : "primary"}
             size="lg"
             loading={isTestSending}
             onClick={handleTestSend}
@@ -153,7 +153,7 @@ const PacketEditor = () => {
             {isTestSending ? "发送中..." : "测试发送"}
           </Button>
           <Button
-            variant="secondary"
+            variant={isTested ? "primary" : "secondary"}
             size="lg"
             onClick={() => {
               if (!isTested) {
