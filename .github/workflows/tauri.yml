@@ -17,6 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Npcap SDK (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          curl -LO https://npcap.com/dist/npcap-sdk-1.13.zip
+          tar -xf npcap-sdk-1.13.zip
+          echo "LIB=$(pwd)/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
+          echo "INCLUDE=$(pwd)/npcap-sdk-1.13/Include" >> $GITHUB_ENV
+
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
@@ -56,6 +64,25 @@ jobs:
         with:
           name: tauri-app-${{ matrix.platform }}
           path: src-tauri/target/release/bundle/
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Python distutils (Linux)
         if: runner.os == 'Linux'
