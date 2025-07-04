@@ -2,11 +2,7 @@
 
 ## 下载地址
 
-- **[Windows 下载（.msi/.exe）](../../releases/latest)**
-- **[macOS 下载（.dmg/.zip）](../../releases/latest)**
-- **[Linux 下载（.AppImage/.deb/.tar.gz）](../../releases/latest)**
-
-> 进入 [Releases 页面](../../releases) 后，选择最新版本，下载对应平台的安装包即可。
+> 进入 [Releases 页面](../../releases/latest) 后，选择最新版本，下载对应平台的安装包即可。
 
 ### macOS 用户安装后处理
 
