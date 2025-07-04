@@ -19,11 +19,14 @@ jobs:
 
       - name: Install Npcap SDK (Windows)
         if: runner.os == 'Windows'
+        shell: bash
         run: |
           curl -LO https://npcap.com/dist/npcap-sdk-1.13.zip
           tar -xf npcap-sdk-1.13.zip
-          echo "LIB=$(pwd)/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
-          echo "INCLUDE=$(pwd)/npcap-sdk-1.13/Include" >> $GITHUB_ENV
+          WIN_PWD=$(pwd -W 2>/dev/null || pwd)
+          echo "LIB=$WIN_PWD/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
+          echo "INCLUDE=$WIN_PWD/npcap-sdk-1.13/Include" >> $GITHUB_ENV
+          echo "PCAP_LIB_DIR=$WIN_PWD/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
 
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
