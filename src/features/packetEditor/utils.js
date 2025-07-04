@@ -40,15 +40,15 @@ function formatSingleValue(k, v, protoKey) {
   }
   // Payload/data 字段，TCP/UDP 支持字符串和十六进制，其他协议只允许十六进制，奇数位自动补零
   if (["data", "payload"].includes(k.toLowerCase()) && typeof v === "string") {
+    const clean = v.replace(/\s/g, "");
     if (protoKey === "tcp" || protoKey === "udp") {
-      if (/^[0-9a-fA-F]+$/.test(v) && v.length % 2 === 0) {
-        return v.match(/.{1,2}/g).map(x => x.toUpperCase()).join(" ");
+      if (/^[0-9a-fA-F]+$/.test(clean) && clean.length % 2 === 0) {
+        return clean.match(/.{1,2}/g).map(x => x.toUpperCase()).join(" ");
       }
-      return v.split("").map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).join(" ");
+      return clean.split("").map((c) => c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).join(" ");
     } else {
-      // 非 TCP/UDP，允许奇数位自动补零（右侧补零）
-      if (/^[0-9a-fA-F]+$/.test(v)) {
-        let hex = v.length % 2 === 0 ? v : v + '0';
+      if (/^[0-9a-fA-F]+$/.test(clean)) {
+        let hex = clean.length % 2 === 0 ? clean : clean + '0';
         return hex.match(/.{1,2}/g).map(x => x.toUpperCase()).join(" ");
       }
       return "??";

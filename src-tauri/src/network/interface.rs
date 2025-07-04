@@ -88,8 +88,7 @@ impl NetworkInterface {
 
         cap.sendpacket(packet)?;
         
-        // 模拟发送成功
-        println!("报文发送成功（模拟）");
+        println!("报文发送成功");
         Ok(())
     }
 } 

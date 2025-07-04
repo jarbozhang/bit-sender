@@ -42,6 +42,16 @@ export const usePacketEditor = () => {
                 sanitizedValue = raw.match(/.{1,2}/g).join(':');
             }
         }
+        // 非TCP/UDP协议的payload字段，自动格式化为16进制分组显示
+        if ((key === 'data' || key === 'payload') && proto.key !== 'tcp' && proto.key !== 'udp') {
+            let raw = sanitizedValue.replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+            let grouped = raw.match(/.{1,2}/g) || [];
+            let lines = [];
+            for (let i = 0; i < grouped.length; i += 16) {
+                lines.push(grouped.slice(i, i + 16).join(' '));
+            }
+            sanitizedValue = lines.join('\n');
+        }
     }
 
     // 2. Enforce maxLength

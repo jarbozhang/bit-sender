@@ -36,7 +36,7 @@ const PacketEditor = () => {
       const packetData = {
         protocol: proto.key,
         fields: completeFields,
-        payload: completeFields.data || null
+        payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
       };
 
       const result = await sendPacket(packetData);
