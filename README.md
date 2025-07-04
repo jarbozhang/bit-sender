@@ -10,6 +10,15 @@
 
 > 进入 [Releases 页面](../../releases) 后，选择最新版本，下载对应平台的安装包即可。
 
+### macOS 用户安装后处理
+
+如果是 macOS 用户，安装完成后需要执行以下命令来移除应用的安全限制：
+
+xattr -cr /Applications/bit-sender.app
+# 或者你下载的路径
+xattr -cr /path/to/bit-sender.app
+
+
 ---
 
 基于 **Tauri + React** 的跨平台高性能网络发包工具，支持自定义协议编辑、批量发送、网卡选择、实时流量统计，并集成自动化构建与多平台分发。
