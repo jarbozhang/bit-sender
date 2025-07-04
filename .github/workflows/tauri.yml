@@ -23,13 +23,13 @@ jobs:
         run: |
           curl -LO https://npcap.com/dist/npcap-sdk-1.13.zip
           unzip -o npcap-sdk-1.13.zip
-          echo "LIB=npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
-          echo "INCLUDE=npcap-sdk-1.13/Include" >> $GITHUB_ENV
-          echo "PCAP_LIB_DIR=npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
+          echo "LIB=Lib/x64" >> $GITHUB_ENV
+          echo "INCLUDE=Include" >> $GITHUB_ENV
+          echo "PCAP_LIB_DIR=Lib/x64" >> $GITHUB_ENV
           pwd
           ls -al
-          ls -al npcap-sdk-1.13/Lib/x64/
-          ls npcap-sdk-1.13/Lib/x64/wpcap.lib
+          ls -al Lib/x64/
+          ls Lib/x64/wpcap.lib
 
       - name: Install system dependencies (Ubuntu)
         if: runner.os == 'Linux'
