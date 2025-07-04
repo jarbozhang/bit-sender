@@ -76,9 +76,9 @@ impl NetworkInterface {
 
     pub fn send_packet(&mut self, packet: &[u8]) -> Result<()> {
         // 开发阶段：只打印报文内容，不实际发送
-        println!("准备发送报文到接口: {}", self.device.name);
-        println!("报文长度: {} bytes", packet.len());
-        println!("报文内容: {:02X?}", packet);
+        // println!("准备发送报文到接口: {}", self.device.name);
+        // println!("报文长度: {} bytes", packet.len());
+        // println!("报文内容: {:02X?}", packet);
         
         // 注释掉实际的发送逻辑，避免权限问题
         let mut cap = pcap::Capture::from_device(self.device.clone())?
@@ -88,7 +88,7 @@ impl NetworkInterface {
 
         cap.sendpacket(packet)?;
         
-        println!("报文发送成功");
+        // println!("报文发送成功");
         Ok(())
     }
 } 

@@ -2,10 +2,13 @@
 
 mod network;
 
-use network::{PacketData, SendResult, NetworkInterface};
+use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap};
 use network::interface::InterfaceInfo;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tauri::State;
+use uuid::Uuid;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -56,14 +59,89 @@ fn get_network_interfaces() -> Result<Vec<InterfaceInfo>, String> {
     }
 }
 
+#[tauri::command]
+async fn start_batch_send(
+    packet_data: serde_json::Value,
+    interface_name: Option<String>,
+    frequency: u32,
+    state: State<'_, TaskMap>,
+) -> Result<String, String> {
+    use tokio::sync::oneshot;
+    use std::time::SystemTime;
+    use std::sync::Mutex;
+
+    let task_id = Uuid::new_v4().to_string();
+    let status = Arc::new(Mutex::new(BatchTaskStatus {
+        task_id: task_id.clone(),
+        start_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+        sent_count: 0,
+        speed: frequency,
+        running: true,
+    }));
+
+    let (stop_tx, mut stop_rx) = oneshot::channel();
+    let status_clone = status.clone();
+    let packet_data_clone = packet_data.clone();
+    let interface_name_clone = interface_name.clone();
+
+    tokio::spawn(async move {
+        let interval = std::time::Duration::from_millis(1000 / frequency.max(1) as u64);
+        loop {
+            tokio::select! {
+                _ = &mut stop_rx => {
+                    let mut s = status_clone.lock().unwrap();
+                    s.running = false;
+                    break;
+                }
+                _ = tokio::time::sleep(interval) => {
+                    // 这里调用你已有的 send_packet 逻辑
+                    let _ = crate::network::send_packet_from_json(&packet_data_clone, interface_name_clone.clone()).await;
+                    let mut s = status_clone.lock().unwrap();
+                    s.sent_count += 1;
+                }
+            }
+        }
+    });
+
+    let mut map = state.lock().unwrap();
+    map.insert(task_id.clone(), BatchTaskHandle {
+        status,
+        stop_tx: Some(stop_tx),
+    });
+
+    Ok(task_id)
+}
+
+#[tauri::command]
+fn get_batch_send_status(task_id: String, state: State<'_, TaskMap>) -> Option<BatchTaskStatus> {
+    let map = state.lock().unwrap();
+    map.get(&task_id).map(|handle| handle.status.lock().unwrap().clone())
+}
+
+#[tauri::command]
+fn stop_batch_send(task_id: String, state: State<'_, TaskMap>) -> bool {
+    let mut map = state.lock().unwrap();
+    if let Some(handle) = map.get_mut(&task_id) {
+        if let Some(stop_tx) = handle.stop_tx.take() {
+            let _ = stop_tx.send(());
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(network::TaskMap::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             send_packet,
-            get_network_interfaces
+            get_network_interfaces,
+            start_batch_send,
+            get_batch_send_status,
+            stop_batch_send
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

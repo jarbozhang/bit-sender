@@ -118,6 +118,21 @@ const PacketEditor = () => {
     handleRuleChange(key, value);
   };
 
+  // 构造当前报文数据
+  const getCurrentPacketData = () => {
+    const completeFields = {};
+    proto.fields.forEach(f => {
+      completeFields[f.key] = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
+        ? f.placeholder
+        : fields[f.key];
+    });
+    return {
+      protocol: proto.key,
+      fields: completeFields,
+      payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
+    };
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
       <div className="mb-4 flex items-center gap-4">
@@ -213,6 +228,8 @@ const PacketEditor = () => {
         onCancel={handleBatchCancel}
         status={batchMode === 'stats' ? batchStatus : null}
         onStop={handleBatchStop}
+        packetData={getCurrentPacketData()}
+        interfaceName={selectedInterface}
       />
     </div>
   );
