@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           curl -LO https://npcap.com/dist/npcap-sdk-1.13.zip
-          tar -xf npcap-sdk-1.13.zip
+          unzip -o npcap-sdk-1.13.zip
           WIN_PWD=$(pwd -W 2>/dev/null || pwd)
           echo "LIB=$WIN_PWD/npcap-sdk-1.13/Lib/x64" >> $GITHUB_ENV
           echo "INCLUDE=$WIN_PWD/npcap-sdk-1.13/Include" >> $GITHUB_ENV
