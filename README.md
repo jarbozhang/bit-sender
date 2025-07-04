@@ -4,6 +4,14 @@
 
 > 进入 [Releases 页面](../../releases/latest) 后，选择最新版本，下载对应平台的安装包即可。
 
+
+## Windows 依赖（Npcap）
+
+- Windows 用户需提前安装 [Npcap](https://nmap.org/npcap/)（推荐，安装时请勾选"WinPcap API 兼容模式"），否则运行时会提示"找不到 wpcap.dll"。
+- Npcap 是网络抓包/发包的底层驱动，WinPcap 已不再维护，建议优先选择 Npcap。
+- 下载地址：[https://nmap.org/npcap/](https://nmap.org/npcap/)
+
+
 ### macOS 用户安装后处理
 
 如果是 macOS 用户，安装完成后需要执行以下命令来移除应用的安全限制：
