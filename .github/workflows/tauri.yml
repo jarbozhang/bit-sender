@@ -48,4 +48,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tauri-app-${{ matrix.platform }}
-          path: src-tauri/target/release/bundle/ 
+          path: src-tauri/target/release/bundle/
+
+      - name: Install Python distutils (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install distutils 

@@ -22,8 +22,8 @@ function AppContent() {
               <span className="text-2xl font-bold text-blue-700 tracking-tight">比达发包器</span>
             </div>
             <div className="hidden md:flex gap-8">
-              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-blue-600 text-sm font-medium text-blue-700 focus:outline-none dark:text-blue-300 dark:border-blue-400">报文编辑</a>
-              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">发送与抓包</a>
+              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-blue-600 text-sm font-medium text-blue-700 focus:outline-none dark:text-blue-300 dark:border-blue-400">发送报文</a>
+              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">网口嗅探</a>
               <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">配置管理</a>
             </div>
             {/* 新增网卡选择入口 */}
