@@ -6,6 +6,9 @@ on:
       - 'v*.*.*'   # 仅在打 tag 时构建发布
   workflow_dispatch: # 也支持手动触发
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
