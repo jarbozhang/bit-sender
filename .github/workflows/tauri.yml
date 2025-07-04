@@ -42,11 +42,11 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libappindicator3-dev patchelf librsvg2-dev
 
       
-      - name: Install Python distutils (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          python3 -m pip install --upgrade pip setuptools wheel
-          python3 -m pip install distutils 
+      # - name: Install Python distutils (Linux)
+      #   if: runner.os == 'Linux'
+      #   run: |
+      #     python3 -m pip install --upgrade pip setuptools wheel
+      #     python3 -m pip install distutils 
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
