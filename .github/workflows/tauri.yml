@@ -31,7 +31,7 @@ jobs:
       - run: pnpm install --no-frozen-lockfile
 
       - name: Install Tauri CLI
-        run: pnpm dlx tauri@latest --version
+        run: pnpm dlx @tauri-apps/cli@latest --version
 
       - name: Build front-end
         run: pnpm build
