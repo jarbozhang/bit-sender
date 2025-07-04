@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
+use crate::network::interface::NetworkSender;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -85,6 +86,37 @@ async fn start_batch_send(
     let interface_name_clone = interface_name.clone();
 
     tokio::spawn(async move {
+        // 优化：只 open 一次设备
+        let mut sender = match interface_name_clone.clone() {
+            Some(ref name) => match NetworkSender::open(name) {
+                Ok(s) => s,
+                Err(e) => {
+                    let mut s = status_clone.lock().unwrap();
+                    s.running = false;
+                    return;
+                }
+            },
+            None => {
+                let mut s = status_clone.lock().unwrap();
+                s.running = false;
+                return;
+            }
+        };
+
+        let packet_bytes = {
+            let protocol = packet_data_clone["protocol"].as_str().unwrap_or("").to_string();
+            let fields_value = packet_data_clone["fields"].as_object().unwrap();
+            let mut fields = std::collections::HashMap::new();
+            for (key, value) in fields_value {
+                if let Some(str_value) = value.as_str() {
+                    fields.insert(key.clone(), str_value.to_string());
+                }
+            }
+            let payload = packet_data_clone["payload"].as_str().map(|s| s.to_string());
+            let packet = crate::network::PacketData { protocol, fields, payload };
+            crate::network::PacketBuilder::new(packet).build().unwrap()
+        };
+
         let interval = std::time::Duration::from_millis(1000 / frequency.max(1) as u64);
         loop {
             tokio::select! {
@@ -94,8 +126,12 @@ async fn start_batch_send(
                     break;
                 }
                 _ = tokio::time::sleep(interval) => {
-                    // 这里调用你已有的 send_packet 逻辑
-                    let _ = crate::network::send_packet_from_json(&packet_data_clone, interface_name_clone.clone()).await;
+                    // 只 send，不 open
+                    if let Err(_e) = sender.send(&packet_bytes) {
+                        let mut s = status_clone.lock().unwrap();
+                        s.running = false;
+                        break;
+                    }
                     let mut s = status_clone.lock().unwrap();
                     s.sent_count += 1;
                 }

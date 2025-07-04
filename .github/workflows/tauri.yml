@@ -1,0 +1,51 @@
+name: Tauri Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # 仅在打 tag 时构建发布
+  workflow_dispatch: # 也支持手动触发
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies (pnpm)
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - run: pnpm install
+
+      - name: Install Tauri CLI
+        run: pnpm dlx tauri@latest --version
+
+      - name: Build front-end
+        run: pnpm build
+
+      - name: Tauri Build
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          args: --ci
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-app-${{ matrix.platform }}
+          path: src-tauri/target/release/bundle/ 

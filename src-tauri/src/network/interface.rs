@@ -91,4 +91,27 @@ impl NetworkInterface {
         // println!("报文发送成功");
         Ok(())
     }
+}
+
+pub struct NetworkSender {
+    cap: pcap::Capture<pcap::Active>,
+}
+
+impl NetworkSender {
+    pub fn open(name: &str) -> anyhow::Result<Self> {
+        let device = pcap::Device::list()?
+            .into_iter()
+            .find(|d| d.name == name)
+            .ok_or_else(|| anyhow::anyhow!("未找到网卡: {}", name))?;
+        let cap = pcap::Capture::from_device(device)?
+            .promisc(true)
+            .snaplen(65535)
+            .open()?;
+        Ok(Self { cap })
+    }
+
+    pub fn send(&mut self, packet: &[u8]) -> anyhow::Result<()> {
+        self.cap.sendpacket(packet)?;
+        Ok(())
+    }
 } 
