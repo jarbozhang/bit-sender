@@ -9,8 +9,7 @@
 
 - Windows 用户需提前安装 [Npcap](https://nmap.org/npcap/)（推荐，安装时请勾选"WinPcap API 兼容模式"），否则运行时会提示"找不到 wpcap.dll"。
 - Npcap 是网络抓包/发包的底层驱动，WinPcap 已不再维护，建议优先选择 Npcap。
-- 下载地址：[https://nmap.org/npcap/](https://nmap.org/npcap/)
-
+- 下载地址：[https://npcap.com/#download](https://npcap.com/#download)
 
 ### macOS 用户安装后处理
 
