@@ -122,6 +122,20 @@ pnpm tauri build
 
 ---
 
+## TODO List
+
+短期优化（代码层面）
+批量发包时去除 sleep，或每次 sleep 更长时间、每次 burst 多个包。
+只在主线程统计速率，发包线程尽量无锁。
+允许用户自定义“最大速率”模式（即尽快发包）。
+中期优化（平台相关）
+Linux/macOS 下可考虑 raw socket 或 libnet。
+Windows 下 Npcap 性能有限，极限提升空间不大。
+长期优化（极限性能）
+研究 DPDK、PF_RING、XDP 等高性能方案，但需牺牲跨平台性和开发复杂度。
+
+---
+
 ## 开发&贡献
 
 欢迎提交 issue 和 PR，完善更多协议、抓包、流量分析等功能！
