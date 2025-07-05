@@ -10,6 +10,10 @@ use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 use crate::network::interface::NetworkSender;
+use crossbeam_channel::{bounded, select};
+use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+use std::sync::Mutex;
+use std::time::SystemTime;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -68,10 +72,10 @@ async fn start_batch_send(
     state: State<'_, TaskMap>,
 ) -> Result<String, String> {
     use tokio::sync::oneshot;
-    use std::time::SystemTime;
-    use std::sync::Mutex;
 
     let task_id = Uuid::new_v4().to_string();
+    let sent_count = Arc::new(AtomicU64::new(0));
+    let running = Arc::new(AtomicBool::new(true));
     let status = Arc::new(Mutex::new(BatchTaskStatus {
         task_id: task_id.clone(),
         start_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
@@ -80,63 +84,150 @@ async fn start_batch_send(
         running: true,
     }));
 
-    let (stop_tx, mut stop_rx) = oneshot::channel();
+    let (stop_tx, stop_rx) = oneshot::channel();
+
+    // 唯一的 stop_rx 监听器，它是一个轻量级的异步任务
+    let running_for_stop = running.clone();
+    tokio::spawn(async move {
+        let _ = stop_rx.await;
+        running_for_stop.store(false, Ordering::Relaxed);
+    });
+
+    // 为主工作任务克隆所需变量
     let status_clone = status.clone();
+    let sent_count_clone = sent_count.clone();
+    let running_clone = running.clone();
     let packet_data_clone = packet_data.clone();
     let interface_name_clone = interface_name.clone();
 
-    tokio::spawn(async move {
-        // 优化：只 open 一次设备
-        let mut sender = match interface_name_clone.clone() {
-            Some(ref name) => match NetworkSender::open(name) {
-                Ok(s) => s,
-                Err(_e) => {
-                    let mut s = status_clone.lock().unwrap();
-                    s.running = false;
-                    return;
-                }
-            },
-            None => {
-                let mut s = status_clone.lock().unwrap();
-                s.running = false;
-                return;
-            }
-        };
+    // 将所有阻塞的发包逻辑都放到一个专用的阻塞线程中，避免饿死 Tokio 运行时
+    tokio::task::spawn_blocking(move || {
+        // burst/batch 参数
+        let burst_size = 100;
+        let thread_count = 4;
+        let freq_per_thread = frequency.max(1) / thread_count.max(1);
 
-        let packet_bytes = {
-            let protocol = packet_data_clone["protocol"].as_str().unwrap_or("").to_string();
-            let fields_value = packet_data_clone["fields"].as_object().unwrap();
-            let mut fields = std::collections::HashMap::new();
-            for (key, value) in fields_value {
-                if let Some(str_value) = value.as_str() {
-                    fields.insert(key.clone(), str_value.to_string());
-                }
-            }
-            let payload = packet_data_clone["payload"].as_str().map(|s| s.to_string());
-            let packet = crate::network::PacketData { protocol, fields, payload };
-            crate::network::PacketBuilder::new(packet).build().unwrap()
-        };
+        if frequency <= 100 {
+            // 低频模式: crossbeam-channel + select!
+            let (tick_tx, tick_rx) = bounded::<()>(1);
 
-        let interval = std::time::Duration::from_millis(1000 / frequency.max(1) as u64);
-        loop {
-            tokio::select! {
-                _ = &mut stop_rx => {
-                    let mut s = status_clone.lock().unwrap();
-                    s.running = false;
-                    break;
-                }
-                _ = tokio::time::sleep(interval) => {
-                    // 只 send，不 open
-                    if let Err(_e) = sender.send(&packet_bytes) {
-                        let mut s = status_clone.lock().unwrap();
-                        s.running = false;
+            // 定时器线程
+            let running_for_ticker = running_clone.clone();
+            let interval = std::time::Duration::from_millis(1000 / frequency.max(1) as u64);
+            std::thread::spawn(move || {
+                while running_for_ticker.load(Ordering::Relaxed) {
+                    std::thread::sleep(interval);
+                    if tick_tx.send(()).is_err() {
                         break;
                     }
-                    let mut s = status_clone.lock().unwrap();
-                    s.sent_count += 1;
+                }
+            });
+
+            // 状态统计线程
+            let status_for_stats = status_clone.clone();
+            let sent_for_stats = sent_count_clone.clone();
+            let running_for_stats = running_clone.clone();
+            std::thread::spawn(move || {
+                while running_for_stats.load(Ordering::Relaxed) {
+                    {
+                        let mut s = status_for_stats.lock().unwrap();
+                        s.sent_count = sent_for_stats.load(Ordering::Relaxed);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                }
+            });
+
+            // 发包主循环
+            let mut sender = match NetworkSender::open(interface_name_clone.as_deref().unwrap_or_default()) {
+                Ok(s) => s,
+                Err(_) => {
+                    running_clone.store(false, Ordering::Relaxed);
+                    return;
+                }
+            };
+            let packet_bytes = network::PacketBuilder::new(PacketData {
+                protocol: packet_data_clone["protocol"].as_str().unwrap_or_default().to_string(),
+                fields: packet_data_clone["fields"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect(),
+                payload: packet_data_clone["payload"].as_str().map(String::from),
+            }).build().unwrap();
+
+            let running_for_loop = running_clone.clone();
+            let step = std::time::Duration::from_millis(10);
+            while running_for_loop.load(Ordering::Relaxed) {
+                select! {
+                    recv(tick_rx) -> _ => {
+                        if sender.send(&packet_bytes).is_err() {
+                            running_for_loop.store(false, Ordering::Relaxed);
+                            break;
+                        }
+                        sent_count_clone.fetch_add(1, Ordering::Relaxed);
+                    },
+                    default(step) => {
+                        // 每隔 10ms 检查一次 running 状态，确保能及时退出
+                    }
                 }
             }
+        } else {
+            // 高频模式: 多线程 burst/batch
+            let mut handles = vec![];
+            for _ in 0..thread_count {
+                let sent_for_thread = sent_count_clone.clone();
+                let running_for_thread = running_clone.clone();
+                let interface_for_thread = interface_name_clone.clone();
+                let packet_for_thread = packet_data_clone.clone();
+
+                handles.push(std::thread::spawn(move || {
+                    let mut sender = match NetworkSender::open(interface_for_thread.as_deref().unwrap_or_default()) {
+                        Ok(s) => s,
+                        Err(_) => {
+                            running_for_thread.store(false, Ordering::Relaxed);
+                            return;
+                        }
+                    };
+                    let packet_bytes = network::PacketBuilder::new(PacketData {
+                        protocol: packet_for_thread["protocol"].as_str().unwrap_or_default().to_string(),
+                        fields: packet_for_thread["fields"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect(),
+                        payload: packet_for_thread["payload"].as_str().map(String::from),
+                    }).build().unwrap();
+
+                    let interval = std::time::Duration::from_millis(1000 / freq_per_thread.max(1) as u64);
+                    while running_for_thread.load(Ordering::Relaxed) {
+                        for _ in 0..burst_size {
+                            if !running_for_thread.load(Ordering::Relaxed) { break; }
+                            if sender.send(&packet_bytes).is_err() {
+                                running_for_thread.store(false, Ordering::Relaxed);
+                                return;
+                            }
+                            sent_for_thread.fetch_add(1, Ordering::Relaxed);
+                        }
+                        std::thread::sleep(interval);
+                    }
+                }));
+            }
+
+            // 状态统计线程
+            let status_for_stats = status_clone.clone();
+            let sent_for_stats = sent_count_clone.clone();
+            let running_for_stats = running_clone.clone();
+            std::thread::spawn(move || {
+                while running_for_stats.load(Ordering::Relaxed) {
+                    {
+                        let mut s = status_for_stats.lock().unwrap();
+                        s.sent_count = sent_for_stats.load(Ordering::Relaxed);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                }
+            });
+
+            for h in handles {
+                let _ = h.join();
+            }
         }
+        
+        // 任务结束，更新最终状态
+        let mut final_status = status_clone.lock().unwrap();
+        final_status.running = false;
+        final_status.sent_count = sent_count_clone.load(Ordering::Relaxed);
     });
 
     let mut map = state.lock().unwrap();
