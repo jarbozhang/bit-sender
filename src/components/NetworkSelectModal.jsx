@@ -40,7 +40,7 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
                 className={`flex flex-col gap-1 p-2 rounded cursor-pointer ${selected === iface.name ? "bg-blue-100 dark:bg-blue-900" : ""}`}
                 onClick={() => setSelected(iface.name)}
                 onDoubleClick={() => {
-                  onSelect(iface.name);
+                  onSelect(iface);
                   onClose();
                 }}
               >
@@ -56,7 +56,7 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
           <button
             className="bg-blue-500 text-white px-4 py-1 rounded disabled:opacity-50"
             disabled={!selected}
-            onClick={() => { onSelect(selected); onClose(); }}
+            onClick={() => { onSelect(interfaces.find(iface => iface.name === selected)); onClose(); }}
           >
             确定
           </button>

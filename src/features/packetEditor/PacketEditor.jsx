@@ -76,16 +76,25 @@ const PacketEditor = () => {
     try {
       const completeFields = {};
       proto.fields.forEach(f => {
-        completeFields[f.key] = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
+        let value = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
           ? f.placeholder
           : fields[f.key];
+        
+        // 处理动态占位符
+        if (value === "__LOCAL_MAC__") {
+          value = localMac;
+        } else if (value === "__LOCAL_IP__") {
+          value = localIp;
+        }
+        
+        completeFields[f.key] = value;
       });
       const packetData = {
         protocol: proto.key,
         fields: completeFields,
         payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
       };
-      const result = await sendPacket(packetData, netIf);
+      const result = await sendPacket(packetData, netIf?.name || netIf);
       showSuccess(result.message);
       setIsTested(true);
     } catch (error) {
@@ -151,9 +160,18 @@ const PacketEditor = () => {
   const getCurrentPacketData = () => {
     const completeFields = {};
     proto.fields.forEach(f => {
-      completeFields[f.key] = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
+      let value = (fields[f.key] === undefined || fields[f.key] === null || String(fields[f.key]).trim() === '')
         ? f.placeholder
         : fields[f.key];
+      
+      // 处理动态占位符
+      if (value === "__LOCAL_MAC__") {
+        value = localMac;
+      } else if (value === "__LOCAL_IP__") {
+        value = localIp;
+      }
+      
+      completeFields[f.key] = value;
     });
     return {
       protocol: proto.key,
@@ -227,7 +245,7 @@ const PacketEditor = () => {
       <div className="mt-6">
         <label className="font-medium text-gray-700 dark:text-gray-300">报文内容预览（16进制）</label>
         <pre className="bg-gray-100 dark:bg-gray-900 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
-          {hexPreview(fields, proto) || <span className="text-gray-500">请填写字段以预览报文内容</span>}
+          {hexPreview(fields, proto, localMac, localIp) || <span className="text-gray-500">请填写字段以预览报文内容</span>}
         </pre>
       </div>
 
@@ -266,7 +284,7 @@ const PacketEditor = () => {
         status={batchMode === 'stats' ? batchStatus : null}
         onStop={handleBatchStop}
         packetData={getCurrentPacketData()}
-        interfaceName={selectedInterface}
+        interfaceName={selectedInterface?.name}
       />
     </div>
   );

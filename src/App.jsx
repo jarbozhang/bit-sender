@@ -31,7 +31,7 @@ function AppContent() {
               className="ml-4 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-blue-100 dark:hover:bg-blue-900 transition"
               onClick={() => setShowSelectModal(true)}
             >
-              当前网卡：{selectedInterface || "未选择"}
+              当前网卡：{selectedInterface?.description || selectedInterface?.name || "未选择"}
             </button>
             {/* 移动端菜单可后续补充 */}
           </div>

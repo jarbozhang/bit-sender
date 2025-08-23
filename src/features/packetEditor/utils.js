@@ -113,14 +113,22 @@ function formatSingleValue(k, v, protoKey) {
   return null;
 }
 
-export function hexPreview(obj, proto) {
+export function hexPreview(obj, proto, localMac = "", localIp = "") {
   const parts = proto.fields
     .map((f) => {
       const value = obj[f.key];
-      const valueToFormat =
+      let valueToFormat =
         value === undefined || value === null || String(value).trim() === ""
           ? f.placeholder
           : value;
+      
+      // 处理动态占位符
+      if (valueToFormat === "__LOCAL_MAC__") {
+        valueToFormat = localMac;
+      } else if (valueToFormat === "__LOCAL_IP__") {
+        valueToFormat = localIp;
+      }
+      
       if (
         valueToFormat === undefined ||
         valueToFormat === null ||
