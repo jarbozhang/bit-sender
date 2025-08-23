@@ -89,10 +89,39 @@ const PacketEditor = () => {
         
         completeFields[f.key] = value;
       });
+      // 处理payload数据，确保与预览一致
+      let processedPayload = null;
+      if (completeFields.data) {
+        const dataValue = completeFields.data.trim();
+        if (dataValue) {
+          // 使用与hexPreview相同的逻辑处理数据
+          const isHexData = /^[0-9a-fA-F\s]*$/.test(dataValue) && dataValue.replace(/\s/g, '').length % 2 === 0;
+          if (proto.key === "tcp" || proto.key === "udp") {
+            if (isHexData) {
+              // 已经是十六进制格式
+              processedPayload = dataValue.replace(/\s/g, '');
+            } else {
+              // 转换字符串为十六进制
+              processedPayload = dataValue
+                .split('')
+                .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+                .join('');
+            }
+          } else {
+            // 其他协议只允许十六进制
+            if (isHexData) {
+              processedPayload = dataValue.replace(/\s/g, '');
+            } else {
+              throw new Error(`协议 ${proto.key} 只支持十六进制数据格式`);
+            }
+          }
+        }
+      }
+      
       const packetData = {
         protocol: proto.key,
         fields: completeFields,
-        payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
+        payload: processedPayload
       };
       const result = await sendPacket(packetData, netIf?.name || netIf);
       showSuccess(result.message);
@@ -173,10 +202,40 @@ const PacketEditor = () => {
       
       completeFields[f.key] = value;
     });
+    // 处理payload数据，确保与预览一致
+    let processedPayload = null;
+    if (completeFields.data) {
+      const dataValue = completeFields.data.trim();
+      if (dataValue) {
+        // 使用与hexPreview相同的逻辑处理数据
+        const isHexData = /^[0-9a-fA-F\s]*$/.test(dataValue) && dataValue.replace(/\s/g, '').length % 2 === 0;
+        if (proto.key === "tcp" || proto.key === "udp") {
+          if (isHexData) {
+            // 已经是十六进制格式
+            processedPayload = dataValue.replace(/\s/g, '');
+          } else {
+            // 转换字符串为十六进制
+            processedPayload = dataValue
+              .split('')
+              .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
+              .join('');
+          }
+        } else {
+          // 其他协议只允许十六进制
+          if (isHexData) {
+            processedPayload = dataValue.replace(/\s/g, '');
+          } else {
+            // 对于非TCP/UDP协议，如果不是十六进制，则返回原始数据
+            processedPayload = dataValue.replace(/\s/g, '');
+          }
+        }
+      }
+    }
+    
     return {
       protocol: proto.key,
       fields: completeFields,
-      payload: completeFields.data ? completeFields.data.replace(/\s/g, '') : null
+      payload: processedPayload
     };
   };
 

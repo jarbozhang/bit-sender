@@ -13,7 +13,7 @@ impl PacketBuilder {
     pub fn build(&self) -> Result<Vec<u8>> {
         match self.data.protocol.to_lowercase().as_str() {
             "ethernet" => self.build_ethernet_packet(),
-            "ip" => self.build_ip_packet(),
+            "ip" | "ipv4" => self.build_ipv4_packet(),
             "tcp" => self.build_tcp_packet(),
             "udp" => self.build_udp_packet(),
             "arp" => self.build_arp_packet(),
@@ -46,6 +46,72 @@ impl PacketBuilder {
         while packet.len() < 64 {
             packet.push(0);
         }
+        
+        Ok(packet)
+    }
+
+    fn build_ipv4_packet(&self) -> Result<Vec<u8>> {
+        let mut packet = Vec::new();
+        
+        // 以太网头部 (14 bytes)
+        let dst_mac = self.get_field("dst_mac", "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&dst_mac)?);
+        
+        let src_mac = self.get_field("src_mac", "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&src_mac)?);
+        
+        let ether_type = self.get_field("ether_type", "0800")?;
+        packet.extend_from_slice(&self.parse_hex(&ether_type)?);
+        
+        // IPv4头部 (20 bytes)
+        let version = self.get_field("version", "4")?.parse::<u8>().unwrap_or(4);
+        let ihl = self.get_field("ihl", "5")?.parse::<u8>().unwrap_or(5);
+        packet.push((version << 4) | ihl);
+        
+        let tos = self.get_field("tos", "0")?.parse::<u8>().unwrap_or(0);
+        packet.push(tos);
+        
+        // 总长度 (稍后计算)
+        let total_length_pos = packet.len();
+        packet.extend_from_slice(&[0x00, 0x00]);
+        
+        let identification = self.get_field("identification", "0")?.parse::<u16>().unwrap_or(0);
+        packet.extend_from_slice(&identification.to_be_bytes());
+        
+        let flags = self.get_field("flags", "2")?.parse::<u8>().unwrap_or(2);
+        let fragment_offset = self.get_field("fragment_offset", "0")?.parse::<u16>().unwrap_or(0);
+        packet.extend_from_slice(&(((flags as u16) << 13) | fragment_offset).to_be_bytes());
+        
+        let ttl = self.get_field("ttl", "64")?.parse::<u8>().unwrap_or(64);
+        packet.push(ttl);
+        
+        let protocol = self.get_field("protocol", "6")?.parse::<u8>().unwrap_or(6);
+        packet.push(protocol);
+        
+        // 头部校验和 (稍后计算)
+        let checksum_pos = packet.len();
+        packet.extend_from_slice(&[0x00, 0x00]);
+        
+        let src_ip = self.get_field("srcIp", "192.168.1.1")?;
+        packet.extend_from_slice(&self.parse_ip(&src_ip)?);
+        
+        let dst_ip = self.get_field("dstIp", "192.168.1.2")?;
+        packet.extend_from_slice(&self.parse_ip(&dst_ip)?);
+        
+        // Payload
+        if let Some(payload) = &self.data.payload {
+            packet.extend_from_slice(&self.parse_hex(payload)?);
+        }
+        
+        // 计算并填充总长度 (IPv4头部 + payload)
+        let ip_length = packet.len() - 14; // 减去以太网头部
+        packet[total_length_pos] = (ip_length >> 8) as u8;
+        packet[total_length_pos + 1] = ip_length as u8;
+        
+        // 计算并填充IPv4头部校验和
+        let checksum = self.calculate_ip_checksum(&packet[14..14 + 20]);
+        packet[checksum_pos] = (checksum >> 8) as u8;
+        packet[checksum_pos + 1] = checksum as u8;
         
         Ok(packet)
     }
@@ -107,68 +173,141 @@ impl PacketBuilder {
     }
 
     fn build_tcp_packet(&self) -> Result<Vec<u8>> {
-        // 先构建 IP 头部
-        let mut packet = self.build_ip_packet()?;
+        let mut packet = Vec::new();
+        
+        // 以太网头部 (14 bytes)
+        let dst_mac = self.get_field("dst_mac", "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&dst_mac)?);
+        
+        let src_mac = self.get_field("src_mac", "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&src_mac)?);
+        
+        let ether_type = self.get_field("ether_type", "0800")?;
+        packet.extend_from_slice(&self.parse_hex(&ether_type)?);
+        
+        // IPv4头部 (20 bytes) - 简化版本
+        packet.push(0x45); // Version 4, IHL 5
+        packet.push(0x00); // TOS
+        
+        // 总长度 (稍后计算)
+        let total_length_pos = packet.len();
+        packet.extend_from_slice(&[0x00, 0x00]);
+        
+        packet.extend_from_slice(&[0x00, 0x00]); // ID
+        packet.extend_from_slice(&[0x40, 0x00]); // Flags, Fragment offset
+        packet.push(64); // TTL
+        packet.push(6); // Protocol (TCP)
+        
+        // IP头部校验和 (稍后计算)
+        let ip_checksum_pos = packet.len();
+        packet.extend_from_slice(&[0x00, 0x00]);
+        
+        let src_ip = self.get_field("srcIp", "192.168.1.1")?;
+        packet.extend_from_slice(&self.parse_ip(&src_ip)?);
+        
+        let dst_ip = self.get_field("dstIp", "192.168.1.2")?;
+        packet.extend_from_slice(&self.parse_ip(&dst_ip)?);
         
         // TCP 头部 (20 bytes)
-        let src_port = self.get_field("src_port", "1234")?;
-        let src_port = u16::from_str_radix(&src_port, 16).unwrap_or(0x04D2);
+        let src_port = self.get_field("srcPort", "12345")?;
+        let src_port = src_port.parse::<u16>().unwrap_or(12345);
         packet.extend_from_slice(&src_port.to_be_bytes());
         
-        let dst_port = self.get_field("dst_port", "5678")?;
-        let dst_port = u16::from_str_radix(&dst_port, 16).unwrap_or(0x162E);
+        let dst_port = self.get_field("dstPort", "80")?;
+        let dst_port = dst_port.parse::<u16>().unwrap_or(80);
         packet.extend_from_slice(&dst_port.to_be_bytes());
         
         // 序列号 (4 bytes)
-        let seq = self.get_field("seq", "00000000")?;
-        packet.extend_from_slice(&self.parse_hex(&seq)?);
+        let seq = self.get_field("seq", "0")?;
+        let seq = seq.parse::<u32>().unwrap_or(0);
+        packet.extend_from_slice(&seq.to_be_bytes());
         
         // 确认号 (4 bytes)
-        let ack = self.get_field("ack", "00000000")?;
-        packet.extend_from_slice(&self.parse_hex(&ack)?);
+        let ack = self.get_field("ack", "0")?;
+        let ack = ack.parse::<u32>().unwrap_or(0);
+        packet.extend_from_slice(&ack.to_be_bytes());
         
         // 数据偏移和标志 (2 bytes)
         packet.extend_from_slice(&[0x50, 0x00]); // 数据偏移 5*4=20, 无标志
         
         // 窗口大小 (2 bytes)
-        let window = self.get_field("window", "4000")?;
-        let window = u16::from_str_radix(&window, 16).unwrap_or(0x0FA0);
-        packet.extend_from_slice(&window.to_be_bytes());
+        let window_size = self.get_field("window_size", "8192")?;
+        let window_size = window_size.parse::<u16>().unwrap_or(8192);
+        packet.extend_from_slice(&window_size.to_be_bytes());
         
         // 校验和 (2 bytes) - 稍后计算
         packet.extend_from_slice(&[0x00, 0x00]);
         
         // 紧急指针 (2 bytes)
-        packet.extend_from_slice(&[0x00, 0x00]);
+        let urgent_pointer = self.get_field("urgent_pointer", "0")?;
+        let urgent_pointer = urgent_pointer.parse::<u16>().unwrap_or(0);
+        packet.extend_from_slice(&urgent_pointer.to_be_bytes());
         
         // Payload
         if let Some(payload) = &self.data.payload {
             packet.extend_from_slice(&self.parse_hex(payload)?);
         }
         
-        // 计算 TCP 校验和
-        let tcp_checksum = self.calculate_tcp_checksum(&packet);
-        let tcp_start = 20; // IP 头部长度
-        packet[tcp_start + 16] = (tcp_checksum >> 8) as u8;
-        packet[tcp_start + 17] = tcp_checksum as u8;
+        // 计算并填充总长度 (IPv4头部 + TCP头部 + payload)
+        let ip_length = packet.len() - 14; // 减去以太网头部
+        packet[total_length_pos] = (ip_length >> 8) as u8;
+        packet[total_length_pos + 1] = ip_length as u8;
+        
+        // 计算并填充IP头部校验和
+        let checksum = self.calculate_ip_checksum(&packet[14..14 + 20]);
+        packet[ip_checksum_pos] = (checksum >> 8) as u8;
+        packet[ip_checksum_pos + 1] = checksum as u8;
         
         Ok(packet)
     }
 
     fn build_udp_packet(&self) -> Result<Vec<u8>> {
-        // 先构建 IP 头部
-        let mut packet = self.build_ip_packet()?;
+        let mut packet = Vec::new();
+        
+        // 以太网头部 (14 bytes)
+        let dst_mac = self.get_field("dst_mac", "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&dst_mac)?);
+        
+        let src_mac = self.get_field("src_mac", "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&src_mac)?);
+        
+        let ether_type = self.get_field("ether_type", "0800")?;
+        packet.extend_from_slice(&self.parse_hex(&ether_type)?);
+        
+        // IPv4头部 (20 bytes) - 简化版本
+        packet.push(0x45); // Version 4, IHL 5
+        packet.push(0x00); // TOS
+        
+        // 总长度 (稍后计算)
+        let total_length_pos = packet.len();
+        packet.extend_from_slice(&[0x00, 0x00]);
+        
+        packet.extend_from_slice(&[0x00, 0x00]); // ID
+        packet.extend_from_slice(&[0x40, 0x00]); // Flags, Fragment offset
+        packet.push(64); // TTL
+        packet.push(17); // Protocol (UDP)
+        
+        // IP头部校验和 (稍后计算)
+        let ip_checksum_pos = packet.len();
+        packet.extend_from_slice(&[0x00, 0x00]);
+        
+        let src_ip = self.get_field("srcIp", "192.168.1.1")?;
+        packet.extend_from_slice(&self.parse_ip(&src_ip)?);
+        
+        let dst_ip = self.get_field("dstIp", "192.168.1.2")?;
+        packet.extend_from_slice(&self.parse_ip(&dst_ip)?);
         
         // UDP 头部 (8 bytes)
-        let src_port = self.get_field("src_port", "1234")?;
-        let src_port = u16::from_str_radix(&src_port, 16).unwrap_or(0x04D2);
+        let src_port = self.get_field("srcPort", "12345")?;
+        let src_port = src_port.parse::<u16>().unwrap_or(12345);
         packet.extend_from_slice(&src_port.to_be_bytes());
         
-        let dst_port = self.get_field("dst_port", "5678")?;
-        let dst_port = u16::from_str_radix(&dst_port, 16).unwrap_or(0x162E);
+        let dst_port = self.get_field("dstPort", "53")?;
+        let dst_port = dst_port.parse::<u16>().unwrap_or(53);
         packet.extend_from_slice(&dst_port.to_be_bytes());
         
-        // 长度 (2 bytes) - 稍后填充
+        // UDP长度 (2 bytes) - 稍后填充
+        let udp_length_pos = packet.len();
         packet.extend_from_slice(&[0x00, 0x00]);
         
         // 校验和 (2 bytes)
@@ -179,10 +318,20 @@ impl PacketBuilder {
             packet.extend_from_slice(&self.parse_hex(payload)?);
         }
         
-        // 计算并填充 UDP 长度
-        let udp_length = (packet.len() - 20) as u16; // 减去 IP 头部
-        packet[22] = (udp_length >> 8) as u8;
-        packet[23] = udp_length as u8;
+        // 计算并填充总长度 (IPv4头部 + UDP头部 + payload)
+        let ip_length = packet.len() - 14; // 减去以太网头部
+        packet[total_length_pos] = (ip_length >> 8) as u8;
+        packet[total_length_pos + 1] = ip_length as u8;
+        
+        // 计算并填充UDP长度 (UDP头部 + payload)
+        let udp_length = (packet.len() - 14 - 20) as u16; // 减去以太网头部和IP头部
+        packet[udp_length_pos] = (udp_length >> 8) as u8;
+        packet[udp_length_pos + 1] = udp_length as u8;
+        
+        // 计算并填充IP头部校验和
+        let checksum = self.calculate_ip_checksum(&packet[14..14 + 20]);
+        packet[ip_checksum_pos] = (checksum >> 8) as u8;
+        packet[ip_checksum_pos + 1] = checksum as u8;
         
         Ok(packet)
     }
@@ -294,8 +443,15 @@ impl PacketBuilder {
     }
 
     fn parse_hex(&self, hex: &str) -> Result<Vec<u8>> {
-        let hex = hex.replace(" ", "").replace(":", "");
+        let mut hex = hex.replace(" ", "").replace(":", "");
+        
+        // 如果是奇数长度，前面补0
         if hex.len() % 2 != 0 {
+            hex = format!("0{}", hex);
+        }
+        
+        // 验证是否为有效的十六进制字符
+        if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(anyhow!("无效的十六进制字符串: {}", hex));
         }
         

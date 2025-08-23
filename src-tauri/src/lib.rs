@@ -145,12 +145,18 @@ async fn start_batch_send(
                 let now = std::time::Instant::now();
                 
                 if now >= next_send_time {
-                    // 发送报文
-                    if sender.send(&packet_bytes).is_err() {
-                        running_clone.store(false, Ordering::Relaxed);
-                        break;
+                    // 发送报文，支持错误重试
+                    match sender.send(&packet_bytes) {
+                        Ok(_) => {
+                            sent_count_clone.fetch_add(1, Ordering::Relaxed);
+                        }
+                        Err(_) => {
+                            // 发送失败时不立即停止，而是稍微延迟后继续尝试
+                            // 这可能是由于网络缓冲区满、网卡过载等临时问题
+                            std::thread::sleep(std::time::Duration::from_millis(1)); // 延迟1ms
+                            // 跳过这个包，继续下一次发送
+                        }
                     }
-                    sent_count_clone.fetch_add(1, Ordering::Relaxed);
                     
                     // 计算下次发送时间
                     next_send_time += interval;
@@ -199,12 +205,18 @@ async fn start_batch_send(
                         let now = std::time::Instant::now();
                         
                         if now >= next_send_time {
-                            // 发送一个报文
-                            if sender.send(&packet_bytes).is_err() {
-                                running_for_thread.store(false, Ordering::Relaxed);
-                                break;
+                            // 发送一个报文，支持错误重试
+                            match sender.send(&packet_bytes) {
+                                Ok(_) => {
+                                    sent_for_thread.fetch_add(1, Ordering::Relaxed);
+                                }
+                                Err(_) => {
+                                    // 发送失败时不立即停止，而是稍微延迟后继续尝试
+                                    // 这可能是由于网络缓冲区满、网卡过载等临时问题
+                                    std::thread::sleep(std::time::Duration::from_micros(1000)); // 延迟1ms
+                                    // 可选择跳过这个包或减少发送速率
+                                }
                             }
-                            sent_for_thread.fetch_add(1, Ordering::Relaxed);
                             
                             // 计算下次发送时间
                             next_send_time += interval;
