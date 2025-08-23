@@ -10,7 +10,7 @@ use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 use crate::network::interface::NetworkSender;
-use crossbeam_channel::{bounded, select};
+// use crossbeam_channel::{bounded, select}; // 保留备用
 use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::SystemTime;
@@ -102,27 +102,13 @@ async fn start_batch_send(
 
     // 将所有阻塞的发包逻辑都放到一个专用的阻塞线程中，避免饿死 Tokio 运行时
     tokio::task::spawn_blocking(move || {
-        // burst/batch 参数
-        let burst_size = 100;
+        // 线程参数
         let thread_count = 4;
-        let freq_per_thread = frequency.max(1) / thread_count.max(1);
 
         if frequency <= 100 {
-            // 低频模式: crossbeam-channel + select!
-            let (tick_tx, tick_rx) = bounded::<()>(1);
-
-            // 定时器线程
-            let running_for_ticker = running_clone.clone();
-            let interval = std::time::Duration::from_millis(1000 / frequency.max(1) as u64);
-            std::thread::spawn(move || {
-                while running_for_ticker.load(Ordering::Relaxed) {
-                    std::thread::sleep(interval);
-                    if tick_tx.send(()).is_err() {
-                        break;
-                    }
-                }
-            });
-
+            // 低频模式: 使用更精确的定时机制
+            let interval_micros = 1_000_000 / frequency.max(1) as u64; // 微秒级精度
+            
             // 状态统计线程
             let status_for_stats = status_clone.clone();
             let sent_for_stats = sent_count_clone.clone();
@@ -133,11 +119,11 @@ async fn start_batch_send(
                         let mut s = status_for_stats.lock().unwrap();
                         s.sent_count = sent_for_stats.load(Ordering::Relaxed);
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             });
 
-            // 发包主循环
+            // 发包主循环：使用精确定时
             let mut sender = match NetworkSender::open(interface_name_clone.as_deref().unwrap_or_default()) {
                 Ok(s) => s,
                 Err(_) => {
@@ -151,24 +137,36 @@ async fn start_batch_send(
                 payload: packet_data_clone["payload"].as_str().map(String::from),
             }).build().unwrap();
 
-            let running_for_loop = running_clone.clone();
-            let step = std::time::Duration::from_millis(10);
-            while running_for_loop.load(Ordering::Relaxed) {
-                select! {
-                    recv(tick_rx) -> _ => {
-                        if sender.send(&packet_bytes).is_err() {
-                            running_for_loop.store(false, Ordering::Relaxed);
-                            break;
-                        }
-                        sent_count_clone.fetch_add(1, Ordering::Relaxed);
-                    },
-                    default(step) => {
-                        // 每隔 10ms 检查一次 running 状态，确保能及时退出
+            let start_time = std::time::Instant::now();
+            let mut next_send_time = start_time;
+            let interval = std::time::Duration::from_micros(interval_micros);
+            
+            while running_clone.load(Ordering::Relaxed) {
+                let now = std::time::Instant::now();
+                
+                if now >= next_send_time {
+                    // 发送报文
+                    if sender.send(&packet_bytes).is_err() {
+                        running_clone.store(false, Ordering::Relaxed);
+                        break;
                     }
+                    sent_count_clone.fetch_add(1, Ordering::Relaxed);
+                    
+                    // 计算下次发送时间
+                    next_send_time += interval;
+                    
+                    // 如果已经落后太多，重新同步到当前时间
+                    if next_send_time < now {
+                        next_send_time = now + interval;
+                    }
+                } else {
+                    // 精确等待到下次发送时间，但最多等待1ms避免长时间阻塞
+                    let sleep_duration = (next_send_time - now).min(std::time::Duration::from_millis(1));
+                    std::thread::sleep(sleep_duration);
                 }
             }
         } else {
-            // 高频模式: 多线程 burst/batch
+            // 高频模式: 使用多线程但保持频率精确控制
             let mut handles = vec![];
             for _ in 0..thread_count {
                 let sent_for_thread = sent_count_clone.clone();
@@ -190,17 +188,36 @@ async fn start_batch_send(
                         payload: packet_for_thread["payload"].as_str().map(String::from),
                     }).build().unwrap();
 
-                    let interval = std::time::Duration::from_millis(1000 / freq_per_thread.max(1) as u64);
+                    // 每个线程的发送间隔（微秒）
+                    let interval_micros = (1_000_000 * thread_count as u64) / frequency.max(1) as u64;
+                    let interval = std::time::Duration::from_micros(interval_micros);
+                    
+                    let start_time = std::time::Instant::now();
+                    let mut next_send_time = start_time;
+                    
                     while running_for_thread.load(Ordering::Relaxed) {
-                        for _ in 0..burst_size {
-                            if !running_for_thread.load(Ordering::Relaxed) { break; }
+                        let now = std::time::Instant::now();
+                        
+                        if now >= next_send_time {
+                            // 发送一个报文
                             if sender.send(&packet_bytes).is_err() {
                                 running_for_thread.store(false, Ordering::Relaxed);
-                                return;
+                                break;
                             }
                             sent_for_thread.fetch_add(1, Ordering::Relaxed);
+                            
+                            // 计算下次发送时间
+                            next_send_time += interval;
+                            
+                            // 如果已经落后太多，重新同步到当前时间
+                            if next_send_time < now {
+                                next_send_time = now + interval;
+                            }
+                        } else {
+                            // 精确等待，但最多等待100微秒避免过度占用CPU
+                            let sleep_duration = (next_send_time - now).min(std::time::Duration::from_micros(100));
+                            std::thread::sleep(sleep_duration);
                         }
-                        std::thread::sleep(interval);
                     }
                 }));
             }
@@ -215,7 +232,7 @@ async fn start_batch_send(
                         let mut s = status_for_stats.lock().unwrap();
                         s.sent_count = sent_for_stats.load(Ordering::Relaxed);
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    std::thread::sleep(std::time::Duration::from_millis(100));
                 }
             });
 
