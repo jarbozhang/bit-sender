@@ -1,32 +1,8 @@
 function formatSingleValue(k, v, protoKey) {
   if (v === undefined || v === null || String(v).trim() === "") return null;
 
-  // MAC
-  if (k.toLowerCase().includes("mac") && typeof v === "string") {
-    if (v.includes(":")) {
-      return v
-        .split(":")
-        .map((seg) =>
-          isNaN(parseInt(seg, 16)) ? "??" : seg.toUpperCase().padStart(2, "0")
-        )
-        .join(" ");
-    } else if (/^[0-9a-fA-F]+$/.test(v)) {
-      return (
-        v
-          .replace(/[^0-9a-fA-F]/g, "")
-          .toUpperCase()
-          .match(/.{1,2}/g)
-          ?.join(" ") || "??"
-      );
-    } else {
-      return "??";
-    }
-  }
   // Type/ether_type 字段，优先按 hex 处理
-  if (
-    ["type", "ether_type", "ttl", "protocol", "opcode", "hwtype", "prototype" ].includes(k.toLowerCase()) &&
-    typeof v === "string"
-  ) {
+  if ( typeof v === "string") {
     let hex = v
       .replace(/^0x/i, "")
       .replace(/[^0-9a-fA-F]/g, "")
@@ -57,6 +33,29 @@ function formatSingleValue(k, v, protoKey) {
       return "??";
     }
   }
+
+  // MAC
+  if (k.toLowerCase().includes("mac") && typeof v === "string") {
+    if (v.includes(":")) {
+      return v
+        .split(":")
+        .map((seg) =>
+          isNaN(parseInt(seg, 16)) ? "??" : seg.toUpperCase().padStart(2, "0")
+        )
+        .join(" ");
+    } else if (/^[0-9a-fA-F]+$/.test(v)) {
+      return (
+        v
+          .replace(/[^0-9a-fA-F]/g, "")
+          .toUpperCase()
+          .match(/.{1,2}/g)
+          ?.join(" ") || "??"
+      );
+    } else {
+      return "??";
+    }
+  }
+  
   // Multi-byte numeric fields
   if (["port", "seq", "ack"].some((fx) => k.toLowerCase().includes(fx))) {
     const num = typeof v === "number" ? v : parseInt(v, 10);

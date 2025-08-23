@@ -5,7 +5,6 @@ import { usePacketEditor } from './usePacketEditor';
 import Button from '../../components/Button';
 import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
-import NetworkSelectModal from '../../components/NetworkSelectModal';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 import BatchSendDialog from '../../components/BatchSendDialog';
 
@@ -20,7 +19,26 @@ const PacketEditor = () => {
   } = usePacketEditor();
 
   const { showSuccess, showError, showInfo } = useToast();
-  const { sendPacket } = useNetwork();
+  const { sendPacket, getNetworkInterfaces } = useNetwork();
+  // 新增本机MAC/IP
+  const [localMac, setLocalMac] = useState("");
+  const [localIp, setLocalIp] = useState("");
+
+  useEffect(() => {
+    // 获取本机网卡信息，取第一个有效网卡
+    getNetworkInterfaces().then((interfaces) => {
+      if (Array.isArray(interfaces)) {
+        const iface = interfaces.find(i => i.mac && i.mac !== "00:00:00:00:00:00" && i.addresses && i.addresses.length > 0);
+        if (iface) {
+          setLocalMac(iface.mac);
+          const ipv4 = (iface.addresses || []).find(addr => /^\d+\.\d+\.\d+\.\d+$/.test(addr));
+          setLocalIp(ipv4);
+        }
+      }
+    });
+  }, []);
+
+
   const [isTestSending, setIsTestSending] = useState(false);
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const [isTested, setIsTested] = useState(false);
@@ -31,6 +49,17 @@ const PacketEditor = () => {
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
+
+
+  // 新增：监听 selectedInterface 变化，自动更新 localMac/localIp
+  useEffect(() => {
+    if (selectedInterface) {
+      console.log("🚀 ~ useEffect ~ selectedInterface:", selectedInterface)
+      setLocalMac(selectedInterface.mac || "");
+      const ipv4 = (selectedInterface.addresses || []).find(addr => /^\d+\.\d+\.\d+\.\d+$/.test(addr));
+      setLocalIp(ipv4 || "");
+    }
+  }, [selectedInterface]);
 
   const handleTestSend = async () => {
     doTestSend();
@@ -157,7 +186,11 @@ const PacketEditor = () => {
             <input
               className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
               type={f.type}
-              placeholder={f.placeholder}
+              placeholder={
+                f.placeholder === "__LOCAL_MAC__" ? localMac :
+                f.placeholder === "__LOCAL_IP__" ? localIp :
+                f.placeholder
+              }
               value={fields[f.key] || ""}
               maxLength={f.maxLength}
               onChange={(e) => handleFieldChangeWrap(f.key, e.target.value, f.maxLength)}
@@ -179,7 +212,11 @@ const PacketEditor = () => {
           <textarea
             className="border rounded px-2 py-1 mt-1 w-full font-mono text-sm bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
             rows="5"
-            placeholder={dataField.placeholder}
+            placeholder={
+              dataField.placeholder === "__LOCAL_MAC__" ? localMac :
+              dataField.placeholder === "__LOCAL_IP__" ? localIp :
+              dataField.placeholder
+            }
             value={fields.data || ""}
             maxLength={dataField.maxLength}
             onChange={(e) => handleFieldChangeWrap(dataField.key, e.target.value, dataField.maxLength)}

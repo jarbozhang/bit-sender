@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct InterfaceInfo {
     pub name: String,
     pub description: Option<String>,
+    pub mac: Option<String>, // 新增
     pub addresses: Vec<String>,
 }
 
@@ -24,9 +25,16 @@ impl NetworkInterface {
                 .map(|addr| format!("{}", addr.addr))
                 .collect();
 
+            // 获取 MAC 地址（macOS/Linux 示例，需在 Cargo.toml 添加 mac_address = "1.1"）
+            let mac = match mac_address::mac_address_by_name(&device.name) {
+                Ok(Some(ma)) => Some(ma.to_string()),
+                _ => None,
+            };
+
             interfaces.push(InterfaceInfo {
                 name: device.name.clone(),
                 description: device.desc.clone(),
+                mac,
                 addresses,
             });
         }
