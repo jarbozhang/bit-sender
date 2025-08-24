@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 import BatchSendDialog from '../../components/BatchSendDialog';
+import { FIELD_DESCRIPTIONS } from './fieldDescriptions';
 
 const PacketEditor = () => {
   const {
@@ -46,6 +47,7 @@ const PacketEditor = () => {
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchStatus, setBatchStatus] = useState(null); // mock 统计数据
   const [batchMode, setBatchMode] = useState('setup'); // 'setup' | 'stats'
+  const [showTooltip, setShowTooltip] = useState(null);
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
@@ -258,8 +260,29 @@ const PacketEditor = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {headerFields.map((f) => (
-          <div key={f.key} className="flex flex-col gap-1">
-            <label className="font-medium text-gray-700 dark:text-gray-300">{f.label}</label>
+          <div key={f.key} className="flex flex-col gap-1 relative">
+            <label className="font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              {f.label}
+              {FIELD_DESCRIPTIONS[f.key] && (
+                <div className="relative inline-block">
+                  <button
+                    type="button"
+                    className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center hover:bg-blue-600 transition-colors"
+                    onMouseEnter={() => setShowTooltip(f.key)}
+                    onMouseLeave={() => setShowTooltip(null)}
+                    onClick={() => setShowTooltip(showTooltip === f.key ? null : f.key)}
+                  >
+                    ?
+                  </button>
+                  {showTooltip === f.key && (
+                    <div className="absolute z-50 w-80 p-3 mt-1 text-sm bg-gray-900 text-white rounded-lg shadow-lg border left-0 top-full">
+                      <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      {FIELD_DESCRIPTIONS[f.key]}
+                    </div>
+                  )}
+                </div>
+              )}
+            </label>
             <input
               className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
               type={f.type}
@@ -284,8 +307,29 @@ const PacketEditor = () => {
       </div>
 
       {dataField && (
-        <div className="mt-4">
-          <label className="font-medium text-gray-700 dark:text-gray-300">{dataField.label}</label>
+        <div className="mt-4 relative">
+          <label className="font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            {dataField.label}
+            {FIELD_DESCRIPTIONS[dataField.key] && (
+              <div className="relative inline-block">
+                <button
+                  type="button"
+                  className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center hover:bg-blue-600 transition-colors"
+                  onMouseEnter={() => setShowTooltip(dataField.key)}
+                  onMouseLeave={() => setShowTooltip(null)}
+                  onClick={() => setShowTooltip(showTooltip === dataField.key ? null : dataField.key)}
+                >
+                  ?
+                </button>
+                {showTooltip === dataField.key && (
+                  <div className="absolute z-50 w-80 p-3 mt-1 text-sm bg-gray-900 text-white rounded-lg shadow-lg border left-0 top-full">
+                    <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 rotate-45"></div>
+                    {FIELD_DESCRIPTIONS[dataField.key]}
+                  </div>
+                )}
+              </div>
+            )}
+          </label>
           <textarea
             className="border rounded px-2 py-1 mt-1 w-full font-mono text-sm bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-gray-100"
             rows="5"
