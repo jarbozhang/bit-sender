@@ -102,155 +102,118 @@ async fn start_batch_send(
 
     // 将所有阻塞的发包逻辑都放到一个专用的阻塞线程中，避免饿死 Tokio 运行时
     tokio::task::spawn_blocking(move || {
-        // 线程参数
-        let thread_count = 4;
+        // 自适应线程数：根据频率动态调整
+        let thread_count = match frequency {
+            1..=100 => 1,      // 低频：单线程精确控制
+            101..=1000 => 2,   // 中频：双线程
+            1001..=10000 => 4, // 高频：四线程
+            _ => 8,            // 超高频：八线程
+        };
 
-        if frequency <= 100 {
-            // 低频模式: 使用更精确的定时机制
-            let interval_micros = 1_000_000 / frequency.max(1) as u64; // 微秒级精度
-            
-            // 状态统计线程
-            let status_for_stats = status_clone.clone();
-            let sent_for_stats = sent_count_clone.clone();
-            let running_for_stats = running_clone.clone();
-            std::thread::spawn(move || {
-                while running_for_stats.load(Ordering::Relaxed) {
-                    {
-                        let mut s = status_for_stats.lock().unwrap();
-                        s.sent_count = sent_for_stats.load(Ordering::Relaxed);
+        // 状态统计线程
+        let status_for_stats = status_clone.clone();
+        let sent_for_stats = sent_count_clone.clone();
+        let running_for_stats = running_clone.clone();
+        std::thread::spawn(move || {
+            while running_for_stats.load(Ordering::Relaxed) {
+                {
+                    let mut s = status_for_stats.lock().unwrap();
+                    s.sent_count = sent_for_stats.load(Ordering::Relaxed);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        });
+
+        // 启动工作线程
+        let mut handles = vec![];
+        for thread_id in 0..thread_count {
+            let sent_for_thread = sent_count_clone.clone();
+            let running_for_thread = running_clone.clone();
+            let interface_for_thread = interface_name_clone.clone();
+            let packet_for_thread = packet_data_clone.clone();
+
+            handles.push(std::thread::spawn(move || {
+                // 初始化网络发送器
+                let mut sender = match NetworkSender::open(interface_for_thread.as_deref().unwrap_or_default()) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        running_for_thread.store(false, Ordering::Relaxed);
+                        return;
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
-            });
+                };
 
-            // 发包主循环：使用精确定时
-            let mut sender = match NetworkSender::open(interface_name_clone.as_deref().unwrap_or_default()) {
-                Ok(s) => s,
-                Err(_) => {
-                    running_clone.store(false, Ordering::Relaxed);
-                    return;
-                }
-            };
-            let packet_bytes = network::PacketBuilder::new(PacketData {
-                protocol: packet_data_clone["protocol"].as_str().unwrap_or_default().to_string(),
-                fields: packet_data_clone["fields"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect(),
-                payload: packet_data_clone["payload"].as_str().map(String::from),
-            }).build().unwrap();
+                // 构建数据包
+                let packet_bytes = match network::PacketBuilder::new(PacketData {
+                    protocol: packet_for_thread["protocol"].as_str().unwrap_or_default().to_string(),
+                    fields: packet_for_thread["fields"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect(),
+                    payload: packet_for_thread["payload"].as_str().map(String::from),
+                }).build() {
+                    Ok(bytes) => bytes,
+                    Err(_) => {
+                        running_for_thread.store(false, Ordering::Relaxed);
+                        return;
+                    }
+                };
 
-            let start_time = std::time::Instant::now();
-            let mut next_send_time = start_time;
-            let interval = std::time::Duration::from_micros(interval_micros);
-            
-            while running_clone.load(Ordering::Relaxed) {
-                let now = std::time::Instant::now();
+                // 计算每个线程的发送间隔（微秒）
+                let interval_micros = (1_000_000 * thread_count as u64) / frequency.max(1) as u64;
+                let interval = std::time::Duration::from_micros(interval_micros);
                 
-                if now >= next_send_time {
-                    // 发送报文，支持错误重试
-                    match sender.send(&packet_bytes) {
-                        Ok(_) => {
-                            sent_count_clone.fetch_add(1, Ordering::Relaxed);
-                        }
-                        Err(_) => {
-                            // 发送失败时不立即停止，而是稍微延迟后继续尝试
-                            // 这可能是由于网络缓冲区满、网卡过载等临时问题
-                            std::thread::sleep(std::time::Duration::from_millis(1)); // 延迟1ms
-                            // 跳过这个包，继续下一次发送
-                        }
-                    }
-                    
-                    // 计算下次发送时间
-                    next_send_time += interval;
-                    
-                    // 如果已经落后太多，重新同步到当前时间
-                    if next_send_time < now {
-                        next_send_time = now + interval;
-                    }
+                // 为每个线程添加随机偏移，避免所有线程同时发送
+                let thread_offset = std::time::Duration::from_micros((interval_micros / thread_count as u64) * thread_id as u64);
+                
+                let start_time = std::time::Instant::now() + thread_offset;
+                let mut next_send_time = start_time;
+                
+                // 根据频率选择不同的等待策略
+                let max_sleep_duration = if frequency <= 100 {
+                    std::time::Duration::from_millis(1)  // 低频：毫秒级等待
+                } else if frequency <= 10000 {
+                    std::time::Duration::from_micros(100) // 中高频：百微秒级等待
                 } else {
-                    // 精确等待到下次发送时间，但最多等待1ms避免长时间阻塞
-                    let sleep_duration = (next_send_time - now).min(std::time::Duration::from_millis(1));
-                    std::thread::sleep(sleep_duration);
-                }
-            }
-        } else {
-            // 高频模式: 使用多线程但保持频率精确控制
-            let mut handles = vec![];
-            for _ in 0..thread_count {
-                let sent_for_thread = sent_count_clone.clone();
-                let running_for_thread = running_clone.clone();
-                let interface_for_thread = interface_name_clone.clone();
-                let packet_for_thread = packet_data_clone.clone();
-
-                handles.push(std::thread::spawn(move || {
-                    let mut sender = match NetworkSender::open(interface_for_thread.as_deref().unwrap_or_default()) {
-                        Ok(s) => s,
-                        Err(_) => {
-                            running_for_thread.store(false, Ordering::Relaxed);
-                            return;
+                    std::time::Duration::from_micros(10)  // 超高频：十微秒级等待
+                };
+                
+                while running_for_thread.load(Ordering::Relaxed) {
+                    let now = std::time::Instant::now();
+                    
+                    if now >= next_send_time {
+                        // 发送报文，支持错误重试
+                        match sender.send(&packet_bytes) {
+                            Ok(_) => {
+                                sent_for_thread.fetch_add(1, Ordering::Relaxed);
+                            }
+                            Err(_) => {
+                                // 发送失败时稍微延迟后继续尝试
+                                // 这可能是由于网络缓冲区满、网卡过载等临时问题
+                                let error_delay = if frequency <= 1000 {
+                                    std::time::Duration::from_millis(1)
+                                } else {
+                                    std::time::Duration::from_micros(100)
+                                };
+                                std::thread::sleep(error_delay);
+                            }
                         }
-                    };
-                    let packet_bytes = network::PacketBuilder::new(PacketData {
-                        protocol: packet_for_thread["protocol"].as_str().unwrap_or_default().to_string(),
-                        fields: packet_for_thread["fields"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect(),
-                        payload: packet_for_thread["payload"].as_str().map(String::from),
-                    }).build().unwrap();
-
-                    // 每个线程的发送间隔（微秒）
-                    let interval_micros = (1_000_000 * thread_count as u64) / frequency.max(1) as u64;
-                    let interval = std::time::Duration::from_micros(interval_micros);
-                    
-                    let start_time = std::time::Instant::now();
-                    let mut next_send_time = start_time;
-                    
-                    while running_for_thread.load(Ordering::Relaxed) {
-                        let now = std::time::Instant::now();
                         
-                        if now >= next_send_time {
-                            // 发送一个报文，支持错误重试
-                            match sender.send(&packet_bytes) {
-                                Ok(_) => {
-                                    sent_for_thread.fetch_add(1, Ordering::Relaxed);
-                                }
-                                Err(_) => {
-                                    // 发送失败时不立即停止，而是稍微延迟后继续尝试
-                                    // 这可能是由于网络缓冲区满、网卡过载等临时问题
-                                    std::thread::sleep(std::time::Duration::from_micros(1000)); // 延迟1ms
-                                    // 可选择跳过这个包或减少发送速率
-                                }
-                            }
-                            
-                            // 计算下次发送时间
-                            next_send_time += interval;
-                            
-                            // 如果已经落后太多，重新同步到当前时间
-                            if next_send_time < now {
-                                next_send_time = now + interval;
-                            }
-                        } else {
-                            // 精确等待，但最多等待100微秒避免过度占用CPU
-                            let sleep_duration = (next_send_time - now).min(std::time::Duration::from_micros(100));
-                            std::thread::sleep(sleep_duration);
+                        // 计算下次发送时间
+                        next_send_time += interval;
+                        
+                        // 如果已经落后太多，重新同步到当前时间
+                        if next_send_time < now {
+                            next_send_time = now + interval;
                         }
+                    } else {
+                        // 精确等待到下次发送时间
+                        let sleep_duration = (next_send_time - now).min(max_sleep_duration);
+                        std::thread::sleep(sleep_duration);
                     }
-                }));
-            }
-
-            // 状态统计线程
-            let status_for_stats = status_clone.clone();
-            let sent_for_stats = sent_count_clone.clone();
-            let running_for_stats = running_clone.clone();
-            std::thread::spawn(move || {
-                while running_for_stats.load(Ordering::Relaxed) {
-                    {
-                        let mut s = status_for_stats.lock().unwrap();
-                        s.sent_count = sent_for_stats.load(Ordering::Relaxed);
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(100));
                 }
-            });
+            }));
+        }
 
-            for h in handles {
-                let _ = h.join();
-            }
+        // 等待所有工作线程结束
+        for handle in handles {
+            let _ = handle.join();
         }
         
         // 任务结束，更新最终状态
