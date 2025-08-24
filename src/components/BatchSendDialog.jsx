@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 
 const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetData, interfaceName }) => {
   const [frequency, setFrequency] = useState(1);
+  const [stopCondition, setStopCondition] = useState('manual'); // 'manual', 'duration', 'count'
+  const [stopValue, setStopValue] = useState(10);
   const [taskId, setTaskId] = useState(null);
   const [taskStatus, setTaskStatus] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -25,7 +27,9 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
       const id = await invoke('start_batch_send', {
         packetData,
         interfaceName,
-        frequency
+        frequency,
+        stopCondition,
+        stopValue
       });
       setTaskId(id);
       // 立即查一次
@@ -113,15 +117,46 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
         
         {/* 设置界面 */}
         {!isSending && !isCompleted && (
-          <div className="mb-4">
-            <label className="block mb-2 text-gray-700 dark:text-gray-300">每秒发送次数：</label>
-            <input
-              type="number"
-              min={1}
-              value={frequency}
-              onChange={e => setFrequency(Math.max(1, Number(e.target.value)))}
-              className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-            />
+          <div className="mb-4 space-y-4">
+            <div>
+              <label className="block mb-2 text-gray-700 dark:text-gray-300">每秒发送次数：</label>
+              <input
+                type="number"
+                min={1}
+                value={frequency}
+                onChange={e => setFrequency(Math.max(1, Number(e.target.value)))}
+                className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            
+            <div>
+              <label className="block mb-2 text-gray-700 dark:text-gray-300">终止条件：</label>
+              <select
+                value={stopCondition}
+                onChange={e => setStopCondition(e.target.value)}
+                className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              >
+                <option value="manual">手动停止</option>
+                <option value="duration">发送指定时长</option>
+                <option value="count">发送指定数量</option>
+              </select>
+            </div>
+            
+            {stopCondition !== 'manual' && (
+              <div>
+                <label className="block mb-2 text-gray-700 dark:text-gray-300">
+                  {stopCondition === 'duration' ? '发送时长（秒）：' : '发送数量（个）：'}
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={stopValue}
+                  onChange={e => setStopValue(Math.max(1, Number(e.target.value)))}
+                  className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  placeholder={stopCondition === 'duration' ? '例如：30' : '例如：1000'}
+                />
+              </div>
+            )}
           </div>
         )}
         
@@ -140,6 +175,50 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
               <span>目标速度：</span>
               <span>{taskStatus.speed} 次/秒</span>
             </div>
+            
+            {/* 进度条和剩余信息 */}
+            {stopCondition !== 'manual' && (
+              <>
+                <div className="flex justify-between">
+                  <span>{stopCondition === 'duration' ? '已运行：' : '进度：'}</span>
+                  <span>
+                    {stopCondition === 'duration' 
+                      ? `${Math.floor((Date.now() - taskStatus.start_time * 1000) / 1000)}s / ${stopValue}s`
+                      : `${taskStatus.sent_count.toLocaleString()} / ${stopValue.toLocaleString()}`
+                    }
+                  </span>
+                </div>
+                
+                {/* 进度条 */}
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.min(100, stopCondition === 'duration' 
+                        ? ((Date.now() - taskStatus.start_time * 1000) / 1000 / stopValue) * 100
+                        : (taskStatus.sent_count / stopValue) * 100
+                      )}%`
+                    }}
+                  ></div>
+                </div>
+                
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <span>
+                    {stopCondition === 'duration' 
+                      ? `剩余时间: ${Math.max(0, stopValue - Math.floor((Date.now() - taskStatus.start_time * 1000) / 1000))}秒`
+                      : `剩余: ${Math.max(0, stopValue - taskStatus.sent_count).toLocaleString()}个`
+                    }
+                  </span>
+                  <span>
+                    {Math.min(100, stopCondition === 'duration' 
+                      ? ((Date.now() - taskStatus.start_time * 1000) / 1000 / stopValue) * 100
+                      : (taskStatus.sent_count / stopValue) * 100
+                    ).toFixed(1)}%
+                  </span>
+                </div>
+              </>
+            )}
+            
             <div className="mt-2 text-green-600 dark:text-green-400 text-center">
               ⚡ 正在发送中...
             </div>
@@ -153,7 +232,14 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
               <div className="text-center mb-3">
                 <div className="text-2xl text-green-600 dark:text-green-400">✅</div>
                 <div className="text-green-800 dark:text-green-300 font-medium">
-                  {completedStats.stoppedManually ? '任务已手动停止' : '任务执行完成'}
+                  {completedStats.stoppedManually 
+                    ? '任务已手动停止' 
+                    : stopCondition === 'duration' 
+                      ? `已按时长完成 (${stopValue}秒)`
+                      : stopCondition === 'count'
+                        ? `已按数量完成 (${stopValue.toLocaleString()}个)`
+                        : '任务执行完成'
+                  }
                 </div>
               </div>
               

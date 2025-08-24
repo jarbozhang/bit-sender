@@ -69,6 +69,8 @@ async fn start_batch_send(
     packet_data: serde_json::Value,
     interface_name: Option<String>,
     frequency: u32,
+    stop_condition: Option<String>,
+    stop_value: Option<u32>,
     state: State<'_, TaskMap>,
 ) -> Result<String, String> {
     use tokio::sync::oneshot;
@@ -99,6 +101,8 @@ async fn start_batch_send(
     let running_clone = running.clone();
     let packet_data_clone = packet_data.clone();
     let interface_name_clone = interface_name.clone();
+    let stop_condition = stop_condition.unwrap_or_else(|| "manual".to_string());
+    let stop_value = stop_value.unwrap_or(0);
 
     // 将所有阻塞的发包逻辑都放到一个专用的阻塞线程中，避免饿死 Tokio 运行时
     tokio::task::spawn_blocking(move || {
@@ -124,6 +128,9 @@ async fn start_batch_send(
             }
         });
 
+        // 记录任务开始时间
+        let task_start_time = std::time::Instant::now();
+        
         // 启动工作线程
         let mut handles = vec![];
         for thread_id in 0..thread_count {
@@ -131,6 +138,7 @@ async fn start_batch_send(
             let running_for_thread = running_clone.clone();
             let interface_for_thread = interface_name_clone.clone();
             let packet_for_thread = packet_data_clone.clone();
+            let stop_condition_clone = stop_condition.clone();
 
             handles.push(std::thread::spawn(move || {
                 // 初始化网络发送器
@@ -176,6 +184,24 @@ async fn start_batch_send(
                 
                 while running_for_thread.load(Ordering::Relaxed) {
                     let now = std::time::Instant::now();
+                    
+                    // 检查终止条件
+                    let should_stop = match stop_condition_clone.as_str() {
+                        "duration" => {
+                            let elapsed_secs = task_start_time.elapsed().as_secs();
+                            elapsed_secs >= stop_value as u64
+                        }
+                        "count" => {
+                            let current_count = sent_for_thread.load(Ordering::Relaxed);
+                            current_count >= stop_value as u64
+                        }
+                        _ => false, // "manual" - 不自动停止
+                    };
+                    
+                    if should_stop {
+                        running_for_thread.store(false, Ordering::Relaxed);
+                        break;
+                    }
                     
                     if now >= next_send_time {
                         // 发送报文，支持错误重试
