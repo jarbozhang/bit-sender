@@ -9,6 +9,7 @@ import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 import BatchSendDialog from '../../components/BatchSendDialog';
 import { FIELD_DESCRIPTIONS } from './fieldDescriptions';
 import { parseHexDump, generateHexDump, isValidHexString, detectProtocolFromHex, parsePacketFields } from './hexDumpUtils';
+import { initializeDefaultTemplates } from '../templateManager/defaultTemplates';
 
 const PacketEditor = () => {
   const {
@@ -51,6 +52,16 @@ const PacketEditor = () => {
   const [showTooltip, setShowTooltip] = useState(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importText, setImportText] = useState('');
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+  
+  // 模板管理状态 (从TemplateManager移过来)
+  const [templates, setTemplates] = useState([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [templateTags, setTemplateTags] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
@@ -145,7 +156,32 @@ const PacketEditor = () => {
     }
   }, [pendingSend, selectedInterface]);
 
-  // ESC键关闭导入对话框
+  // 加载模板
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = () => {
+    try {
+      const allTemplates = initializeDefaultTemplates();
+      setTemplates(allTemplates);
+    } catch (error) {
+      console.error('加载模板失败:', error);
+      showError('加载模板失败');
+    }
+  };
+
+  const saveTemplates = (newTemplates) => {
+    try {
+      localStorage.setItem('packet-templates', JSON.stringify(newTemplates));
+      setTemplates(newTemplates);
+    } catch (error) {
+      console.error('保存模板失败:', error);
+      showError('保存模板失败');
+    }
+  };
+
+  // ESC键关闭对话框、点击外部关闭工具菜单、模态框滚动锁定
   useEffect(() => {
     const handleEscapeKey = (event) => {
       if (event.key === 'Escape') {
@@ -153,16 +189,45 @@ const PacketEditor = () => {
           setShowImportDialog(false);
           setImportText('');
         }
+        if (showSaveDialog) {
+          setShowSaveDialog(false);
+          setTemplateName('');
+          setTemplateDescription('');
+          setTemplateTags('');
+        }
+        if (showLoadDialog) {
+          setShowLoadDialog(false);
+          setSearchTerm('');
+        }
+        if (showToolsMenu) {
+          setShowToolsMenu(false);
+        }
       }
     };
 
-    if (showImportDialog) {
-      document.addEventListener('keydown', handleEscapeKey);
-      return () => {
-        document.removeEventListener('keydown', handleEscapeKey);
-      };
+    const handleClickOutside = (event) => {
+      if (showToolsMenu && !event.target.closest('.tools-menu-container')) {
+        setShowToolsMenu(false);
+      }
+    };
+
+    // 模态框滚动锁定
+    if (showImportDialog || showSaveDialog || showLoadDialog) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
     }
-  }, [showImportDialog]);
+
+    document.addEventListener('keydown', handleEscapeKey);
+    document.addEventListener('click', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+      document.removeEventListener('click', handleClickOutside);
+      // 清理时恢复滚动
+      document.body.style.overflow = 'unset';
+    };
+  }, [showImportDialog, showSaveDialog, showLoadDialog, showToolsMenu]);
 
   const handleBatchSend = () => {
     setShowBatchDialog(true);
@@ -362,6 +427,106 @@ const PacketEditor = () => {
     processImportedData(importText);
   };
 
+  // 加载模板
+  const handleLoadTemplate = (template) => {
+    // 切换协议
+    handleProtoChangeWrap({ target: { value: template.protocol } });
+    
+    // 延迟填充字段，确保协议切换完成
+    setTimeout(() => {
+      Object.entries(template.fields).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          // 检查是否是动态占位符，如果是则不填充，保持空值让系统使用占位符
+          if (value === '__LOCAL_MAC__' || value === '__LOCAL_IP__') {
+            // 对于动态占位符，我们清空字段值，这样系统会使用占位符
+            handleFieldChangeWrap(key, '');
+          } else {
+            handleFieldChangeWrap(key, value);
+          }
+        }
+      });
+    }, 100);
+  };
+
+  // 保存模板
+  const handleSaveTemplate = () => {
+    if (!templateName.trim()) {
+      showError('请输入模板名称');
+      return;
+    }
+
+    const currentPacket = getCurrentPacketData();
+    if (!currentPacket.protocol || !currentPacket.fields) {
+      showError('当前没有有效的数据包配置');
+      return;
+    }
+
+    // 处理字段值，将本机MAC/IP恢复为占位符
+    const processedFields = {};
+    Object.entries(currentPacket.fields).forEach(([key, value]) => {
+      if (typeof value === 'string' && value.trim() !== '') {
+        if (key.toLowerCase().includes('mac') && /^[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}$/i.test(value)) {
+          if (['src_mac', 'srcmac', 'source_mac'].includes(key.toLowerCase())) {
+            processedFields[key] = '__LOCAL_MAC__';
+            return;
+          }
+        }
+        if (key.toLowerCase().includes('ip') && /^\d+\.\d+\.\d+\.\d+$/.test(value)) {
+          if (['src_ip', 'srcip', 'source_ip'].includes(key.toLowerCase())) {
+            processedFields[key] = '__LOCAL_IP__';
+            return;
+          }
+        }
+      }
+      processedFields[key] = value;
+    });
+
+    const newTemplate = {
+      id: Date.now().toString(),
+      name: templateName.trim(),
+      description: templateDescription.trim(),
+      protocol: currentPacket.protocol,
+      fields: processedFields,
+      tags: templateTags.split(',').map(tag => tag.trim()).filter(tag => tag),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const existingIndex = templates.findIndex(t => t.name === newTemplate.name);
+    let newTemplates;
+    
+    if (existingIndex >= 0) {
+      newTemplates = [...templates];
+      newTemplates[existingIndex] = { ...newTemplates[existingIndex], ...newTemplate, updatedAt: new Date().toISOString() };
+      showSuccess('模板已更新');
+    } else {
+      newTemplates = [...templates, newTemplate];
+      showSuccess('模板已保存');
+    }
+
+    saveTemplates(newTemplates);
+    setShowSaveDialog(false);
+    setTemplateName('');
+    setTemplateDescription('');
+    setTemplateTags('');
+  };
+
+  // 加载选中的模板
+  const handleLoadFromTemplateList = (template) => {
+    handleLoadTemplate(template);
+    setShowLoadDialog(false);
+    showInfo(`已加载模板：${template.name}`);
+  };
+
+  // 删除模板
+  const handleDeleteTemplate = (templateId) => {
+    if (window.confirm('确定要删除这个模板吗？')) {
+      const newTemplates = templates.filter(t => t.id !== templateId);
+      saveTemplates(newTemplates);
+      showSuccess('模板已删除');
+    }
+  };
+
   // 构造当前报文数据
   const getCurrentPacketData = () => {
     const completeFields = {};
@@ -434,26 +599,88 @@ const PacketEditor = () => {
           </select>
         </div>
         
-        {/* 导入导出按钮 - 移动到右侧 */}
-        <div className="flex items-center gap-1 ml-auto">
+        {/* 工具菜单按钮 */}
+        <div className="relative ml-auto tools-menu-container">
           <button
-            onClick={() => setShowImportDialog(true)}
+            onClick={() => setShowToolsMenu(!showToolsMenu)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
-            导入
-          </button>
-          <button
-            onClick={handleExportHexDump}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            工具
+            <svg className={`w-3 h-3 transition-transform duration-150 ${showToolsMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-            导出
           </button>
+
+          {/* 工具菜单下拉框 */}
+          {showToolsMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-20 min-w-[200px]">
+              <div className="py-1">
+                {/* 模板管理 */}
+                <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
+                  模板管理
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSaveDialog(true);
+                    setShowToolsMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  保存为模板
+                </button>
+                <button
+                  onClick={() => {
+                    setShowLoadDialog(true);
+                    setShowToolsMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  </svg>
+                  加载模板 ({templates.length})
+                </button>
+
+                {/* 分隔线 */}
+                <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+
+                {/* 导入导出 */}
+                <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
+                  数据交换
+                </div>
+                <button
+                  onClick={() => {
+                    setShowImportDialog(true);
+                    setShowToolsMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                  </svg>
+                  导入数据包
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportHexDump();
+                    setShowToolsMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  导出数据包
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -659,6 +886,207 @@ const PacketEditor = () => {
                 disabled={!importText.trim()}
               >
                 导入文本
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 保存模板对话框 */}
+      {showSaveDialog && (
+        <div 
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowSaveDialog(false);
+              setTemplateName('');
+              setTemplateDescription('');
+              setTemplateTags('');
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[500px] max-w-[600px] w-full mx-4">
+            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
+              保存数据包模板
+            </h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  模板名称 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="例如：ARP请求模板、TCP SYN攻击"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  maxLength={50}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  描述
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="描述这个模板的用途和特点..."
+                  value={templateDescription}
+                  onChange={(e) => setTemplateDescription(e.target.value)}
+                  rows={3}
+                  maxLength={200}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  标签
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="用逗号分隔，例如：测试,网络发现,常用"
+                  value={templateTags}
+                  onChange={(e) => setTemplateTags(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                className="px-4 py-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                onClick={() => {
+                  setShowSaveDialog(false);
+                  setTemplateName('');
+                  setTemplateDescription('');
+                  setTemplateTags('');
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+                onClick={handleSaveTemplate}
+                disabled={!templateName.trim()}
+              >
+                保存模板
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 加载模板对话框 */}
+      {showLoadDialog && (
+        <div 
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLoadDialog(false);
+              setSearchTerm('');
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[700px] max-w-[800px] w-full mx-4 max-h-[80vh] flex flex-col">
+            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
+              加载数据包模板
+            </h2>
+            
+            {/* 搜索框 */}
+            <div className="mb-4">
+              <input
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                placeholder="搜索模板名称、描述或标签..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* 模板列表 */}
+            <div className="flex-1 overflow-y-auto">
+              {templates.filter(template => 
+                template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                template.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                template.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+              ).length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  {templates.length === 0 ? '还没有保存的模板' : '没有找到匹配的模板'}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {templates.filter(template => 
+                    template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    template.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    template.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+                  ).map((template) => (
+                    <div
+                      key={template.id}
+                      className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                              {template.name}
+                            </h3>
+                            <span className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+                              {template.protocol}
+                            </span>
+                          </div>
+                          
+                          {template.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              {template.description}
+                            </p>
+                          )}
+                          
+                          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+                            <span>创建: {new Date(template.createdAt).toLocaleDateString()}</span>
+                            <span>字段: {Object.keys(template.fields).length} 个</span>
+                            {template.tags.length > 0 && (
+                              <div className="flex gap-1">
+                                {template.tags.map((tag, index) => (
+                                  <span key={index} className="px-1 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs">
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            className="px-3 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded"
+                            onClick={() => handleLoadFromTemplateList(template)}
+                          >
+                            加载
+                          </button>
+                          <button
+                            className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded"
+                            onClick={() => handleDeleteTemplate(template.id)}
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                className="px-4 py-2 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                onClick={() => {
+                  setShowLoadDialog(false);
+                  setSearchTerm('');
+                }}
+              >
+                关闭
               </button>
             </div>
           </div>
