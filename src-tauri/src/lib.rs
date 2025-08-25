@@ -279,6 +279,8 @@ fn stop_batch_send(task_id: String, state: State<'_, TaskMap>) -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(network::TaskMap::default())
         .invoke_handler(tauri::generate_handler![
             greet,

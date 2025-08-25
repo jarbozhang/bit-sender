@@ -8,6 +8,7 @@ import { useNetwork } from '../../hooks/useNetwork';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 import BatchSendDialog from '../../components/BatchSendDialog';
 import { FIELD_DESCRIPTIONS } from './fieldDescriptions';
+import { parseHexDump, generateHexDump, isValidHexString, detectProtocolFromHex, parsePacketFields } from './hexDumpUtils';
 
 const PacketEditor = () => {
   const {
@@ -48,6 +49,8 @@ const PacketEditor = () => {
   const [batchStatus, setBatchStatus] = useState(null); // mock 统计数据
   const [batchMode, setBatchMode] = useState('setup'); // 'setup' | 'stats'
   const [showTooltip, setShowTooltip] = useState(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importText, setImportText] = useState('');
 
   const dataField = proto.fields.find(f => f.key === 'data');
   const headerFields = proto.fields.filter(f => f.key !== 'data');
@@ -142,6 +145,25 @@ const PacketEditor = () => {
     }
   }, [pendingSend, selectedInterface]);
 
+  // ESC键关闭导入对话框
+  useEffect(() => {
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape') {
+        if (showImportDialog) {
+          setShowImportDialog(false);
+          setImportText('');
+        }
+      }
+    };
+
+    if (showImportDialog) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => {
+        document.removeEventListener('keydown', handleEscapeKey);
+      };
+    }
+  }, [showImportDialog]);
+
   const handleBatchSend = () => {
     setShowBatchDialog(true);
     setBatchMode('setup');
@@ -185,6 +207,159 @@ const PacketEditor = () => {
   const handleRuleChangeWrap = (key, value) => {
     setIsTested(false);
     handleRuleChange(key, value);
+  };
+
+  // 导出为 Hex Dump 格式
+  const handleExportHexDump = async () => {
+    const previewHex = hexPreview(fields, proto, localMac, localIp);
+    if (!previewHex) {
+      showError('没有数据可导出，请先填写报文字段');
+      return;
+    }
+    
+    try {
+      // 将预览的十六进制转换为连续字符串
+      const hexString = previewHex.replace(/\s+/g, '');
+      const hexDump = generateHexDump(hexString);
+      
+      // 生成默认文件名
+      const defaultFileName = `packet_${proto.name}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+      
+      // 使用 Tauri 的文件保存对话框
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      
+      const filePath = await save({
+        defaultPath: defaultFileName,
+        filters: [
+          {
+            name: 'Text Files',
+            extensions: ['txt']
+          },
+          {
+            name: 'All Files',
+            extensions: ['*']
+          }
+        ]
+      });
+      
+      if (filePath) {
+        // 使用 Tauri 的文件系统 API 写入文件
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        await writeTextFile(filePath, hexDump);
+        
+        showSuccess(`已导出到: ${filePath}`);
+      }
+      
+    } catch (error) {
+      console.error('导出失败:', error);
+      const errorMessage = error?.message || error?.toString() || '未知错误';
+      showError('导出失败: ' + errorMessage);
+    }
+  };
+
+  // 从文件导入
+  const handleImportFromFile = async () => {
+    try {
+      // 使用 Tauri 的文件打开对话框
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      
+      const selected = await open({
+        multiple: false,
+        filters: [
+          {
+            name: 'Text Files',
+            extensions: ['txt']
+          },
+          {
+            name: 'All Files',
+            extensions: ['*']
+          }
+        ]
+      });
+      
+      if (selected) {
+        // 使用 Tauri 的文件系统 API 读取文件
+        const { readTextFile } = await import('@tauri-apps/plugin-fs');
+        const fileContent = await readTextFile(selected);
+        
+        // 处理导入的数据
+        const success = processImportedData(fileContent);
+        if (success) {
+          showSuccess('文件导入成功');
+          setShowImportDialog(false);
+          setImportText('');
+        }
+      }
+      
+    } catch (error) {
+      console.error('文件导入失败:', error);
+      const errorMessage = error?.message || error?.toString() || '未知错误';
+      showError('文件导入失败: ' + errorMessage);
+    }
+  };
+
+  // 处理导入的数据（从文本框或文件）
+  const processImportedData = (dataText) => {
+    if (!dataText || !dataText.trim()) {
+      showError('没有数据可导入');
+      return;
+    }
+
+    try {
+      // 解析 Hex Dump 格式
+      const hexData = parseHexDump(dataText);
+      
+      if (!hexData) {
+        showError('无法解析导入的数据，请检查格式');
+        return;
+      }
+
+      if (!isValidHexString(hexData)) {
+        showError('导入的数据不是有效的十六进制格式');
+        return;
+      }
+
+      // 尝试自动识别协议
+      const detectedProtocol = detectProtocolFromHex(hexData);
+      if (detectedProtocol) {
+        const targetProto = PROTOCOLS.find(p => p.key === detectedProtocol);
+        if (targetProto) {
+          // 先切换协议
+          handleProtoChangeWrap({ target: { value: detectedProtocol } });
+          
+          // 解析字段并回填
+          const parsedFields = parsePacketFields(hexData, detectedProtocol);
+          if (parsedFields && Object.keys(parsedFields).length > 0) {
+            // 批量更新字段
+            setTimeout(() => {
+              Object.entries(parsedFields).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                  handleFieldChangeWrap(key, value);
+                }
+              });
+              showInfo(`自动识别为 ${targetProto.name} 协议并回填字段`);
+            }, 100);
+          } else {
+            showInfo(`自动识别为 ${targetProto.name} 协议`);
+          }
+        }
+      } else {
+        // 如果无法识别协议，将数据作为 payload 处理
+        handleFieldChangeWrap('data', hexData);
+      }
+      
+      setShowImportDialog(false);
+      setImportText('');
+      return true;
+    } catch (error) {
+      showError('导入失败: ' + error.message);
+      return false;
+    }
+  };
+
+  // 处理文本框导入
+  const handleImport = () => {
+    processImportedData(importText);
   };
 
   // 构造当前报文数据
@@ -243,19 +418,43 @@ const PacketEditor = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
-      <div className="mb-4 flex items-center gap-4">
-        <label className="font-medium text-gray-700 dark:text-gray-300">协议类型：</label>
-        <select
-          className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-          value={proto.key}
-          onChange={handleProtoChangeWrap}
-        >
-          {PROTOCOLS.map((p) => (
-            <option key={p.key} value={p.key} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
-              {p.name}
-            </option>
-          ))}
-        </select>
+      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <label className="font-medium text-gray-700 dark:text-gray-300">协议类型：</label>
+          <select
+            className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+            value={proto.key}
+            onChange={handleProtoChangeWrap}
+          >
+            {PROTOCOLS.map((p) => (
+              <option key={p.key} value={p.key} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* 导入导出按钮 - 移动到右侧 */}
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={() => setShowImportDialog(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            导入
+          </button>
+          <button
+            onClick={handleExportHexDump}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            导出
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -389,6 +588,82 @@ const PacketEditor = () => {
         packetData={getCurrentPacketData()}
         interfaceName={selectedInterface?.name}
       />
+      
+      {/* 导入对话框 */}
+      {showImportDialog && (
+        <div 
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowImportDialog(false);
+              setImportText('');
+            }
+          }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[500px] max-w-[700px] w-full mx-4">
+            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
+              导入 Hex Dump 数据
+            </h2>
+            
+            <div className="mb-4">
+              <label className="block mb-2 text-sm text-gray-600 dark:text-gray-400">
+                输入方式：
+              </label>
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={handleImportFromFile}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded flex items-center gap-2"
+                >
+                  📁 从文件导入
+                </button>
+                <span className="text-gray-400 dark:text-gray-500 flex items-center">或</span>
+                <span className="text-gray-600 dark:text-gray-400 flex items-center">手动粘贴</span>
+              </div>
+              
+              <label className="block mb-2 text-sm text-gray-600 dark:text-gray-400">
+                粘贴 Wireshark 导出的 Hex Dump 格式数据：
+              </label>
+              <div className="text-xs text-gray-500 dark:text-gray-500 mb-2">
+                支持格式示例：<br/>
+                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                  0000  ff ff ff ff ff ff 00 11  22 33 44 55 08 06 00 01
+                </code>
+              </div>
+              <textarea
+                className="w-full h-40 border rounded px-3 py-2 font-mono text-sm bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                placeholder="0000  ff ff ff ff ff ff 00 11  22 33 44 55 08 06 00 01&#10;0010  08 00 06 04 00 01 00 11  22 33 44 55 c0 a8 01 01&#10;0020  00 00 00 00 00 00 c0 a8  01 02"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setShowImportDialog(false);
+                    setImportText('');
+                  }
+                }}
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                onClick={() => {
+                  setShowImportDialog(false);
+                  setImportText('');
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
+                onClick={handleImport}
+                disabled={!importText.trim()}
+              >
+                导入文本
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
