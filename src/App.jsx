@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import PacketEditor from "./features/packetEditor";
 import NetworkSniffer from "./features/networkSniffer/NetworkSniffer";
-import ResponseMonitor from "./features/responseMonitor/ResponseMonitor";
+// import ResponseMonitor from "./features/responseMonitor/ResponseMonitor"; // 临时隐藏
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { ToastContainer } from "./components/Toast";
@@ -45,7 +45,8 @@ function AppContent() {
               >
                 网口嗅探
               </button>
-              <button 
+{/* 响应监控页面临时隐藏，后续启用 */}
+              {/* <button 
                 onClick={() => setActiveTab('response-monitor')}
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
                   activeTab === 'response-monitor' 
@@ -54,7 +55,7 @@ function AppContent() {
                 }`}
               >
                 响应监控
-              </button>
+              </button> */}
               <button 
                 onClick={() => setActiveTab('config-manager')}
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
@@ -100,7 +101,8 @@ function AppContent() {
             </div>
           )}
 
-          {activeTab === 'response-monitor' && (
+{/* 响应监控内容区域临时隐藏 */}
+          {/* {activeTab === 'response-monitor' && (
             <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
               <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
                 <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
@@ -108,7 +110,7 @@ function AppContent() {
               </h2>
               <ResponseMonitor />
             </div>
-          )}
+          )} */}
 
           {activeTab === 'config-manager' && (
             <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">

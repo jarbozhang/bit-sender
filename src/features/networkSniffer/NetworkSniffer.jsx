@@ -38,6 +38,7 @@ const NetworkSniffer = () => {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showDetails, setShowDetails] = useState(null);
   const [pauseUpdates, setPauseUpdates] = useState(false);
+  const [showFilters, setShowFilters] = useState(false); // 过滤器折叠状态，默认折叠
   
   // 虚拟滚动设置
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
@@ -388,61 +389,116 @@ const NetworkSniffer = () => {
         </div>
       </div>
 
-      {/* 过滤器 */}
-      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">过滤器</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-          <select
-            value={filters.protocol}
-            onChange={(e) => setFilters(prev => ({ ...prev, protocol: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-          >
-            <option value="all">所有协议</option>
-            <option value="tcp">TCP</option>
-            <option value="udp">UDP</option>
-            <option value="arp">ARP</option>
-            <option value="icmp">ICMP</option>
-          </select>
-          
-          <input
-            type="text"
-            placeholder="源MAC地址"
-            value={filters.srcMac}
-            onChange={(e) => setFilters(prev => ({ ...prev, srcMac: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-          />
-          
-          <input
-            type="text"
-            placeholder="目标MAC地址"
-            value={filters.dstMac}
-            onChange={(e) => setFilters(prev => ({ ...prev, dstMac: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-          />
-          
-          <input
-            type="text"
-            placeholder="源IP地址"
-            value={filters.srcIp}
-            onChange={(e) => setFilters(prev => ({ ...prev, srcIp: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-          />
-          
-          <input
-            type="text"
-            placeholder="目标IP地址"
-            value={filters.dstIp}
-            onChange={(e) => setFilters(prev => ({ ...prev, dstIp: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-          />
-          
-          <input
-            type="text"
-            placeholder="端口"
-            value={filters.port}
-            onChange={(e) => setFilters(prev => ({ ...prev, port: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
-          />
+      {/* 过滤器 - 可折叠 */}
+      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg mb-4 overflow-hidden">
+        {/* 折叠标题栏 */}
+        <div 
+          className="px-4 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center justify-between"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <svg 
+              className={`w-4 h-4 transition-transform duration-200 ${showFilters ? 'rotate-90' : 'rotate-0'}`} 
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            过滤器
+            {/* 显示当前激活的过滤器数量 */}
+            {(filters.protocol !== 'all' || filters.srcMac || filters.dstMac || filters.srcIp || filters.dstIp || filters.port) && (
+              <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
+                {[
+                  filters.protocol !== 'all' ? 1 : 0,
+                  filters.srcMac ? 1 : 0,
+                  filters.dstMac ? 1 : 0,
+                  filters.srcIp ? 1 : 0,
+                  filters.dstIp ? 1 : 0,
+                  filters.port ? 1 : 0
+                ].reduce((a, b) => a + b, 0)}
+              </span>
+            )}
+          </h3>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {showFilters ? '点击收起' : '点击展开'}
+          </span>
+        </div>
+        
+        {/* 过滤器内容区域 - 动画折叠 */}
+        <div className={`transition-all duration-300 ease-in-out ${showFilters ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="px-4 pb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+              <select
+                value={filters.protocol}
+                onChange={(e) => setFilters(prev => ({ ...prev, protocol: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+              >
+                <option value="all">所有协议</option>
+                <option value="tcp">TCP</option>
+                <option value="udp">UDP</option>
+                <option value="arp">ARP</option>
+                <option value="icmp">ICMP</option>
+              </select>
+              
+              <input
+                type="text"
+                placeholder="源MAC地址"
+                value={filters.srcMac}
+                onChange={(e) => setFilters(prev => ({ ...prev, srcMac: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+              />
+              
+              <input
+                type="text"
+                placeholder="目标MAC地址"
+                value={filters.dstMac}
+                onChange={(e) => setFilters(prev => ({ ...prev, dstMac: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+              />
+              
+              <input
+                type="text"
+                placeholder="源IP地址"
+                value={filters.srcIp}
+                onChange={(e) => setFilters(prev => ({ ...prev, srcIp: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+              />
+              
+              <input
+                type="text"
+                placeholder="目标IP地址"
+                value={filters.dstIp}
+                onChange={(e) => setFilters(prev => ({ ...prev, dstIp: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+              />
+              
+              <input
+                type="text"
+                placeholder="端口"
+                value={filters.port}
+                onChange={(e) => setFilters(prev => ({ ...prev, port: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+              />
+            </div>
+            
+            {/* 快速清空过滤器按钮 */}
+            {(filters.protocol !== 'all' || filters.srcMac || filters.dstMac || filters.srcIp || filters.dstIp || filters.port) && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => setFilters({
+                    protocol: 'all',
+                    srcMac: '',
+                    dstMac: '',
+                    srcIp: '',
+                    dstIp: '',
+                    port: ''
+                  })}
+                  className="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md transition-colors"
+                >
+                  清空过滤器
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -488,9 +544,9 @@ const NetworkSniffer = () => {
         </div>
         
         <div 
-          className="max-h-96 overflow-y-auto" 
+          className="overflow-y-auto" 
           onScroll={handleScroll}
-          style={{ height: '384px' }} // 固定高度以支持虚拟滚动
+          style={{ height: '350px' }} // 调整为350px，合适的显示空间
         >
           {filteredPackets.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
