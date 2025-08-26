@@ -330,10 +330,14 @@ fn get_captured_packets(
     if let Ok(sniffer) = sniffer_state.lock() {
         let packets = sniffer.get_packets(max_count);
         
-        // 将数据包转发给响应监控器处理
+        // 只有在响应监控运行时才转发数据包，避免重复统计
+        // 数据包在捕获时已经被处理过一次，这里不应该重复处理
         if let Ok(monitor) = monitor_state.lock() {
-            for packet in &packets {
-                monitor.process_received_packet(packet);
+            if monitor.is_running() {
+                // 只转发给响应监控器处理，不重复统计
+                for packet in &packets {
+                    monitor.process_received_packet(packet);
+                }
             }
         }
         

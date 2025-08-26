@@ -554,6 +554,8 @@ pub struct SnifferManager {
     running: Arc<AtomicBool>,
     // 添加数据包缓存，支持多次访问和过滤
     packet_cache: Arc<Mutex<VecDeque<CapturedPacket>>>,
+    // 跟踪已发送给前端的数据包索引，避免重复发送
+    last_sent_index: Arc<Mutex<usize>>,
 }
 
 impl SnifferManager {
@@ -565,6 +567,7 @@ impl SnifferManager {
             statistics: None,
             running: Arc::new(AtomicBool::new(false)),
             packet_cache: Arc::new(Mutex::new(VecDeque::new())),
+            last_sent_index: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -801,9 +804,12 @@ impl SnifferManager {
         self.packet_receiver = None;
         self.statistics = None;
         
-        // 清理数据包缓存
+        // 清理数据包缓存和重置索引
         if let Ok(mut cache) = self.packet_cache.lock() {
             cache.clear();
+        }
+        if let Ok(mut idx) = self.last_sent_index.lock() {
+            *idx = 0;
         }
     }
 
@@ -812,22 +818,46 @@ impl SnifferManager {
     }
 
     pub fn get_statistics(&self) -> Option<PacketStatistics> {
+        // 直接返回实际的统计信息，不从缓存重新计算
+        // 这样确保统计数据反映真实的捕获情况，而非当前缓存状态
         if let Some(ref stats) = self.statistics {
             if let Ok(stats_guard) = stats.lock() {
-                return Some(stats_guard.clone());
+                Some(stats_guard.clone())
+            } else {
+                None
             }
+        } else {
+            None
         }
-        None
     }
 
     pub fn get_packets(&self, max_count: usize) -> Vec<CapturedPacket> {
-        if let Ok(cache) = self.packet_cache.lock() {
-            // 从缓存中获取最新的数据包，按时间倒序（最新的在前）
-            cache.iter()
-                .rev()
-                .take(max_count)
+        if let (Ok(cache), Ok(mut last_sent_idx)) = (self.packet_cache.lock(), self.last_sent_index.lock()) {
+            let cache_len = cache.len();
+            
+            // 如果没有新数据包，返回空
+            if *last_sent_idx >= cache_len {
+                return Vec::new();
+            }
+            
+            // 计算要发送的数据包范围
+            let start_idx = *last_sent_idx;
+            let end_idx = std::cmp::min(start_idx + max_count, cache_len);
+            
+            // 获取新数据包（从最旧的开始，因为我们要按时间顺序）
+            let new_packets: Vec<CapturedPacket> = cache.iter()
+                .skip(start_idx)
+                .take(end_idx - start_idx)
                 .cloned()
-                .collect()
+                .collect();
+            
+            // 更新已发送索引
+            *last_sent_idx = end_idx;
+            
+            // 返回新数据包，按时间倒序（最新的在前）
+            let mut result = new_packets;
+            result.reverse();
+            result
         } else {
             Vec::new()
         }
