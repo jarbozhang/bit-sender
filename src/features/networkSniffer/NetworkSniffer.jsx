@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -39,11 +39,17 @@ const NetworkSniffer = () => {
   const [showDetails, setShowDetails] = useState(null);
   const [pauseUpdates, setPauseUpdates] = useState(false);
   
-  // 调试计数器
+  // 虚拟滚动设置
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
+  const ITEM_HEIGHT = 80; // 每个数据包行的估计高度
+  const VISIBLE_ITEMS = 50; // 可见区域显示的数据包数量
+  
+  // 调试计数器和性能监控
   const [debugInfo, setDebugInfo] = useState({
     apiCalls: 0,
     packetsReceived: 0,
-    lastUpdate: null
+    lastUpdate: null,
+    renderTime: 0
   });
 
   // 启动嗅探
@@ -120,26 +126,47 @@ const NetworkSniffer = () => {
         other: 0
       }
     });
+    // 重置接收计数器
+    setDebugInfo(prev => ({
+      ...prev,
+      packetsReceived: 0
+    }));
   };
 
-  // 过滤数据包
-  const filteredPackets = packets.filter(packet => {
-    if (filters.protocol !== 'all' && packet.protocol !== filters.protocol) return false;
+  // 优化的过滤数据包 - 使用 useMemo 避免每次重新计算
+  const filteredPackets = useMemo(() => {
+    return packets.filter(packet => {
+      if (filters.protocol !== 'all' && packet.protocol !== filters.protocol) return false;
+      
+      const srcMac = packet.src_mac || packet.srcMac || '';
+      const dstMac = packet.dst_mac || packet.dstMac || '';
+      const srcIp = packet.src_ip || packet.srcIp || '';
+      const dstIp = packet.dst_ip || packet.dstIp || '';
+      const srcPort = packet.src_port || packet.srcPort;
+      const dstPort = packet.dst_port || packet.dstPort;
+      
+      if (filters.srcMac && !srcMac.toLowerCase().includes(filters.srcMac.toLowerCase())) return false;
+      if (filters.dstMac && !dstMac.toLowerCase().includes(filters.dstMac.toLowerCase())) return false;
+      if (filters.srcIp && !srcIp.includes(filters.srcIp)) return false;
+      if (filters.dstIp && !dstIp.includes(filters.dstIp)) return false;
+      if (filters.port && !(srcPort?.toString().includes(filters.port) || dstPort?.toString().includes(filters.port))) return false;
+      return true;
+    });
+  }, [packets, filters]);
+
+  // 虚拟滚动的可见数据包
+  const visiblePackets = useMemo(() => {
+    return filteredPackets.slice(visibleRange.start, visibleRange.end);
+  }, [filteredPackets, visibleRange]);
+
+  // 处理虚拟滚动
+  const handleScroll = useCallback((e) => {
+    const scrollTop = e.target.scrollTop;
+    const start = Math.floor(scrollTop / ITEM_HEIGHT);
+    const end = Math.min(start + VISIBLE_ITEMS, filteredPackets.length);
     
-    const srcMac = packet.src_mac || packet.srcMac || '';
-    const dstMac = packet.dst_mac || packet.dstMac || '';
-    const srcIp = packet.src_ip || packet.srcIp || '';
-    const dstIp = packet.dst_ip || packet.dstIp || '';
-    const srcPort = packet.src_port || packet.srcPort;
-    const dstPort = packet.dst_port || packet.dstPort;
-    
-    if (filters.srcMac && !srcMac.toLowerCase().includes(filters.srcMac.toLowerCase())) return false;
-    if (filters.dstMac && !dstMac.toLowerCase().includes(filters.dstMac.toLowerCase())) return false;
-    if (filters.srcIp && !srcIp.includes(filters.srcIp)) return false;
-    if (filters.dstIp && !dstIp.includes(filters.dstIp)) return false;
-    if (filters.port && !(srcPort?.toString().includes(filters.port) || dstPort?.toString().includes(filters.port))) return false;
-    return true;
-  });
+    setVisibleRange({ start, end });
+  }, [filteredPackets.length]);
 
 
   // 格式化字节数
@@ -234,17 +261,20 @@ const NetworkSniffer = () => {
         const newPackets = await invoke('get_captured_packets', { maxCount });
         
         if (newPackets && newPackets.length > 0) {
-          // 更新调试信息
-          setDebugInfo(prev => ({ 
-            ...prev, 
-            packetsReceived: prev.packetsReceived + newPackets.length
-          }));
+          const renderStart = performance.now();
           
           setPackets(prev => {
             // 限制显示的数据包数量，避免渲染太多DOM元素
             const combined = [...newPackets, ...prev].slice(0, maxPackets);
             return combined;
           });
+          
+          // 更新调试信息 - 现在后端只返回新数据包，所以可以安全累加
+          setDebugInfo(prevDebug => ({ 
+            ...prevDebug, 
+            packetsReceived: prevDebug.packetsReceived + newPackets.length, // 累加新接收的数据包
+            renderTime: performance.now() - renderStart
+          }));
         }
       } catch (error) {
         console.error('获取数据包失败:', error);
@@ -425,7 +455,7 @@ const NetworkSniffer = () => {
                 数据包列表 ({filteredPackets.length})
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                API调用: {debugInfo.apiCalls} | 接收: {debugInfo.packetsReceived} | 最后更新: {debugInfo.lastUpdate}
+                API调用: {debugInfo.apiCalls} | 接收: {debugInfo.packetsReceived} | 渲染: {debugInfo.renderTime.toFixed(2)}ms | 显示: {visiblePackets.length}/{filteredPackets.length} | 最后更新: {debugInfo.lastUpdate}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -446,72 +476,56 @@ const NetworkSniffer = () => {
                 <option value={100}>100条</option>
                 <option value={500}>500条</option>
                 <option value={1000}>1000条</option>
-                <option value={5000}>5000条</option>
+                <option value={2000}>2000条 (优化)</option>
+                <option value={5000}>5000条 (虚拟滚动)</option>
+                <option value={10000}>10000条 (虚拟滚动)</option>
               </select>
+              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                {maxPackets > 1000 ? '虚拟滚动已启用' : ''}
+              </span>
             </div>
           </div>
         </div>
         
-        <div className="max-h-96 overflow-y-auto">
+        <div 
+          className="max-h-96 overflow-y-auto" 
+          onScroll={handleScroll}
+          style={{ height: '384px' }} // 固定高度以支持虚拟滚动
+        >
           {filteredPackets.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               {isSniffing ? '等待数据包...' : '点击"开始嗅探"开始捕获网络数据包'}
             </div>
           ) : (
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredPackets.map((packet) => (
-                <div
-                  key={packet.id}
-                  className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                  onClick={() => setShowDetails(showDetails === packet.id ? null : packet.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatTime(packet.timestamp)}
-                      </span>
-                      <span className={`px-2 py-1 text-xs rounded ${getProtocolColor(packet.protocol)}`}>
-                        {packet.protocol.toUpperCase()}
-                      </span>
-                      <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
-                        {packet.src_ip || packet.srcIp}:{packet.src_port || packet.srcPort || '—'} → {packet.dst_ip || packet.dstIp}:{packet.dst_port || packet.dstPort || '—'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span>{formatBytes(packet.size)}</span>
-                      <svg 
-                        className={`w-4 h-4 transition-transform ${showDetails === packet.id ? 'rotate-180' : ''}`} 
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  {showDetails === packet.id && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <div className="text-gray-600 dark:text-gray-400">源MAC地址:</div>
-                          <div className="font-mono text-gray-900 dark:text-gray-100">{packet.src_mac || packet.srcMac}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-600 dark:text-gray-400">目标MAC地址:</div>
-                          <div className="font-mono text-gray-900 dark:text-gray-100">{packet.dst_mac || packet.dstMac}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-600 dark:text-gray-400">数据包大小:</div>
-                          <div className="text-gray-900 dark:text-gray-100">{formatBytes(packet.size)}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-600 dark:text-gray-400">信息:</div>
-                          <div className="text-gray-900 dark:text-gray-100">{packet.info}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+            <div 
+              style={{ 
+                height: filteredPackets.length * ITEM_HEIGHT,
+                position: 'relative'
+              }}
+            >
+              <div 
+                style={{
+                  transform: `translateY(${visibleRange.start * ITEM_HEIGHT}px)`,
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                }}
+              >
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {visiblePackets.map((packet) => (
+                    <PacketRow
+                      key={packet.id}
+                      packet={packet}
+                      showDetails={showDetails === packet.id}
+                      onToggleDetails={() => setShowDetails(showDetails === packet.id ? null : packet.id)}
+                      formatTime={formatTime}
+                      formatBytes={formatBytes}
+                      getProtocolColor={getProtocolColor}
+                    />
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>
@@ -519,5 +533,71 @@ const NetworkSniffer = () => {
     </div>
   );
 };
+
+// 优化的数据包行组件 - 使用 React.memo 避免不必要的重新渲染
+const PacketRow = React.memo(({ 
+  packet, 
+  showDetails, 
+  onToggleDetails, 
+  formatTime, 
+  formatBytes, 
+  getProtocolColor 
+}) => {
+  return (
+    <div
+      className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+      onClick={onToggleDetails}
+      style={{ minHeight: '80px' }} // 确保虚拟滚动的一致高度
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {formatTime(packet.timestamp)}
+          </span>
+          <span className={`px-2 py-1 text-xs rounded ${getProtocolColor(packet.protocol)}`}>
+            {packet.protocol.toUpperCase()}
+          </span>
+          <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
+            {packet.src_ip || packet.srcIp}:{packet.src_port || packet.srcPort || '—'} → {packet.dst_ip || packet.dstIp}:{packet.dst_port || packet.dstPort || '—'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>{formatBytes(packet.size)}</span>
+          <svg 
+            className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`} 
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+      
+      {showDetails && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-gray-600 dark:text-gray-400">源MAC地址:</div>
+              <div className="font-mono text-gray-900 dark:text-gray-100">{packet.src_mac || packet.srcMac}</div>
+            </div>
+            <div>
+              <div className="text-gray-600 dark:text-gray-400">目标MAC地址:</div>
+              <div className="font-mono text-gray-900 dark:text-gray-100">{packet.dst_mac || packet.dstMac}</div>
+            </div>
+            <div>
+              <div className="text-gray-600 dark:text-gray-400">数据包大小:</div>
+              <div className="text-gray-900 dark:text-gray-100">{formatBytes(packet.size)}</div>
+            </div>
+            <div>
+              <div className="text-gray-600 dark:text-gray-400">信息:</div>
+              <div className="text-gray-900 dark:text-gray-100">{packet.info}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+PacketRow.displayName = 'PacketRow';
 
 export default NetworkSniffer;
