@@ -5,7 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 
 const ResponseMonitor = () => {
   const { selectedInterface } = useNetworkInterface();
-  const { showSuccess, showError, showInfo } = useToast();
+  const { showSuccess, showError, showInfo, showSmartError } = useToast();
   
   // 监控状态
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -94,7 +94,7 @@ const ResponseMonitor = () => {
       
     } catch (error) {
       console.error('启动响应监控失败:', error);
-      showError('启动响应监控失败: ' + (error.message || error));
+      showSmartError('启动响应监控失败: ' + (error.message || error));
       setIsMonitoring(false);
     }
   };
@@ -108,7 +108,7 @@ const ResponseMonitor = () => {
       
     } catch (error) {
       console.error('停止响应监控失败:', error);
-      showError('停止响应监控失败: ' + (error.message || error));
+      showSmartError('停止响应监控失败: ' + (error.message || error));
     }
   };
 

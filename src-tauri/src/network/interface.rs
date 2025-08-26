@@ -83,21 +83,36 @@ impl NetworkInterface {
     }
 
     pub fn send_packet(&mut self, packet: &[u8]) -> Result<()> {
-        // 开发阶段：只打印报文内容，不实际发送
-        // println!("准备发送报文到接口: {}", self.device.name);
-        // println!("报文长度: {} bytes", packet.len());
-        // println!("报文内容: {:02X?}", packet);
-        
-        // 注释掉实际的发送逻辑，避免权限问题
-        let mut cap = pcap::Capture::from_device(self.device.clone())?
-            .promisc(true)
-            .snaplen(65535)
-            .open()?;
+        let mut cap = match pcap::Capture::from_device(self.device.clone()) {
+            Ok(cap) => cap,
+            Err(e) => {
+                return Err(anyhow!(
+                    "无法打开网络接口 {}: {}\n\n解决方案:\n1. 使用 sudo 运行程序\n2. 或者运行: sudo setcap cap_net_raw+ep <程序路径>",
+                    self.device.name, e
+                ));
+            }
+        }.promisc(true)
+         .snaplen(65535);
 
-        cap.sendpacket(packet)?;
-        
-        // println!("报文发送成功");
-        Ok(())
+        let mut cap = match cap.open() {
+            Ok(cap) => cap,
+            Err(e) => {
+                return Err(anyhow!(
+                    "打开网络接口 {} 失败: {}\n\n这通常是权限问题。解决方案:\n1. 使用 sudo 运行程序\n2. 或者为程序设置权限: sudo setcap cap_net_raw+ep <程序路径>\n3. 或者将用户添加到 pcap 组 (如果存在): sudo usermod -a -G pcap $USER",
+                    self.device.name, e
+                ));
+            }
+        };
+
+        match cap.sendpacket(packet) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                Err(anyhow!(
+                    "发送数据包失败: {}\n\n这是权限错误。请尝试:\n1. sudo 运行程序\n2. 设置程序权限: sudo setcap cap_net_raw+ep <程序路径>",
+                    e
+                ))
+            }
+        }
     }
 }
 
@@ -111,15 +126,40 @@ impl NetworkSender {
             .into_iter()
             .find(|d| d.name == name)
             .ok_or_else(|| anyhow::anyhow!("未找到网卡: {}", name))?;
-        let cap = pcap::Capture::from_device(device)?
-            .promisc(true)
-            .snaplen(65535)
-            .open()?;
+        
+        let cap = match pcap::Capture::from_device(device) {
+            Ok(cap) => cap,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "无法访问网卡 {}: {}\n\n权限不足！解决方案:\n1. sudo 运行程序\n2. 设置权限: sudo setcap cap_net_raw+ep <程序路径>",
+                    name, e
+                ));
+            }
+        }.promisc(true)
+         .snaplen(65535);
+
+        let cap = match cap.open() {
+            Ok(cap) => cap,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "打开网卡 {} 失败: {}\n\n权限错误！解决方案:\n1. sudo 运行程序\n2. 设置权限: sudo setcap cap_net_raw+ep <程序路径>\n3. 添加用户到 pcap 组: sudo usermod -a -G pcap $USER",
+                    name, e
+                ));
+            }
+        };
+        
         Ok(Self { cap })
     }
 
     pub fn send(&mut self, packet: &[u8]) -> anyhow::Result<()> {
-        self.cap.sendpacket(packet)?;
-        Ok(())
+        match self.cap.sendpacket(packet) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                Err(anyhow::anyhow!(
+                    "发送数据包失败: {}\n\n权限错误！解决方案:\n1. sudo 运行程序\n2. 设置权限: sudo setcap cap_net_raw+ep <程序路径>",
+                    e
+                ))
+            }
+        }
     }
 } 

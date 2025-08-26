@@ -21,7 +21,7 @@ const PacketEditor = () => {
     handleRuleChange,
   } = usePacketEditor();
 
-  const { showSuccess, showError, showInfo } = useToast();
+  const { showSuccess, showError, showInfo, showSmartError } = useToast();
   const { sendPacket, getNetworkInterfaces } = useNetwork();
   // 新增本机MAC/IP
   const [localMac, setLocalMac] = useState("");
@@ -143,7 +143,7 @@ const PacketEditor = () => {
       showSuccess(result.message);
       setIsTested(true);
     } catch (error) {
-      showError(error.message);
+      showSmartError(error.message);
     } finally {
       setIsTestSending(false);
     }

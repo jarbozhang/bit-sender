@@ -5,12 +5,13 @@ import NetworkSniffer from "./features/networkSniffer/NetworkSniffer";
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { ToastContainer } from "./components/Toast";
+import ErrorDialog from "./components/ErrorDialog";
 import { useToast, ToastProvider } from "./contexts/ToastContext";
 import { NetworkInterfaceProvider, useNetworkInterface } from "./contexts/NetworkInterfaceContext";
 
 function AppContent() {
   useSystemTheme();
-  const { toasts, removeToast } = useToast();
+  const { toasts, removeToast, errorDialog, closeErrorDialog } = useToast();
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const [activeTab, setActiveTab] = useState('packet-editor');
 
@@ -133,6 +134,15 @@ function AppContent() {
       
       {/* Toast 通知容器 */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
+      
+      {/* 错误详情对话框 */}
+      <ErrorDialog
+        isOpen={errorDialog.isOpen}
+        onClose={closeErrorDialog}
+        title={errorDialog.title}
+        message={errorDialog.message}
+        details={errorDialog.details}
+      />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 
 const NetworkSniffer = () => {
   const { selectedInterface } = useNetworkInterface();
-  const { showSuccess, showError, showInfo } = useToast();
+  const { showSuccess, showError, showInfo, showSmartError } = useToast();
   
   // 嗅探状态
   const [isSniffing, setIsSniffing] = useState(false);
@@ -93,7 +93,7 @@ const NetworkSniffer = () => {
       
     } catch (error) {
       console.error('启动嗅探失败:', error);
-      showError('启动嗅探失败: ' + (error.message || error));
+      showSmartError('启动嗅探失败: ' + (error.message || error));
       setIsSniffing(false);
     }
   };
@@ -108,7 +108,7 @@ const NetworkSniffer = () => {
       
     } catch (error) {
       console.error('停止嗅探失败:', error);
-      showError('停止嗅探失败: ' + (error.message || error));
+      showSmartError('停止嗅探失败: ' + (error.message || error));
     }
   };
 
