@@ -1,0 +1,523 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
+import { useToast } from '../../contexts/ToastContext';
+
+const NetworkSniffer = () => {
+  const { selectedInterface } = useNetworkInterface();
+  const { showSuccess, showError, showInfo } = useToast();
+  
+  // 嗅探状态
+  const [isSniffing, setIsSniffing] = useState(false);
+  const [packets, setPackets] = useState([]);
+  const [statistics, setStatistics] = useState({
+    totalPackets: 0,
+    bytesPerSec: 0,
+    packetsPerSec: 0,
+    protocolStats: {
+      tcp: 0,
+      udp: 0,
+      arp: 0,
+      icmp: 0,
+      other: 0
+    }
+  });
+  
+  // 过滤器状态
+  const [filters, setFilters] = useState({
+    protocol: 'all',
+    srcMac: '',
+    dstMac: '',
+    srcIp: '',
+    dstIp: '',
+    port: ''
+  });
+  
+  // 显示设置
+  const [maxPackets, setMaxPackets] = useState(1000);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [showDetails, setShowDetails] = useState(null);
+  const [pauseUpdates, setPauseUpdates] = useState(false);
+  
+  // 调试计数器
+  const [debugInfo, setDebugInfo] = useState({
+    apiCalls: 0,
+    packetsReceived: 0,
+    lastUpdate: null
+  });
+
+  // 启动嗅探
+  const startSniffing = async () => {
+    if (!selectedInterface) {
+      showError('请先选择网络接口');
+      return;
+    }
+
+    try {
+      setIsSniffing(true);
+      setPackets([]);
+      setStatistics({
+        totalPackets: 0,
+        bytesPerSec: 0,
+        packetsPerSec: 0,
+        protocolStats: {
+          tcp: 0,
+          udp: 0,
+          arp: 0,
+          icmp: 0,
+          other: 0
+        }
+      });
+      
+      // 调用后端API启动嗅探
+      const result = await invoke('start_packet_capture', {
+        interfaceName: selectedInterface.name,
+        filters: {
+          protocol: filters.protocol === 'all' ? null : filters.protocol,
+          srcMac: filters.srcMac || null,
+          dstMac: filters.dstMac || null,
+          srcIp: filters.srcIp || null,
+          dstIp: filters.dstIp || null,
+          port: filters.port || null
+        }
+      });
+      
+      showSuccess(result);
+      
+    } catch (error) {
+      console.error('启动嗅探失败:', error);
+      showError('启动嗅探失败: ' + (error.message || error));
+      setIsSniffing(false);
+    }
+  };
+
+  // 停止嗅探
+  const stopSniffing = async () => {
+    try {
+      // 调用后端API停止嗅探
+      const result = await invoke('stop_packet_capture');
+      setIsSniffing(false);
+      showInfo(result);
+      
+    } catch (error) {
+      console.error('停止嗅探失败:', error);
+      showError('停止嗅探失败: ' + (error.message || error));
+    }
+  };
+
+  // 清空数据
+  const clearData = () => {
+    setPackets([]);
+    setStatistics({
+      totalPackets: 0,
+      bytesPerSec: 0,
+      packetsPerSec: 0,
+      protocolStats: {
+        tcp: 0,
+        udp: 0,
+        arp: 0,
+        icmp: 0,
+        other: 0
+      }
+    });
+  };
+
+  // 过滤数据包
+  const filteredPackets = packets.filter(packet => {
+    if (filters.protocol !== 'all' && packet.protocol !== filters.protocol) return false;
+    
+    const srcMac = packet.src_mac || packet.srcMac || '';
+    const dstMac = packet.dst_mac || packet.dstMac || '';
+    const srcIp = packet.src_ip || packet.srcIp || '';
+    const dstIp = packet.dst_ip || packet.dstIp || '';
+    const srcPort = packet.src_port || packet.srcPort;
+    const dstPort = packet.dst_port || packet.dstPort;
+    
+    if (filters.srcMac && !srcMac.toLowerCase().includes(filters.srcMac.toLowerCase())) return false;
+    if (filters.dstMac && !dstMac.toLowerCase().includes(filters.dstMac.toLowerCase())) return false;
+    if (filters.srcIp && !srcIp.includes(filters.srcIp)) return false;
+    if (filters.dstIp && !dstIp.includes(filters.dstIp)) return false;
+    if (filters.port && !(srcPort?.toString().includes(filters.port) || dstPort?.toString().includes(filters.port))) return false;
+    return true;
+  });
+
+
+  // 格式化字节数
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // 格式化时间
+  const formatTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString();
+  };
+
+  // 协议颜色映射
+  const getProtocolColor = (protocol) => {
+    const colors = {
+      tcp: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      udp: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      arp: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      icmp: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      other: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    };
+    return colors[protocol] || colors.other;
+  };
+
+  // 定时获取数据包和统计信息
+  useEffect(() => {
+    if (!isSniffing) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      // 如果用户暂停了更新，只获取统计信息，不获取数据包
+      if (pauseUpdates) {
+        try {
+          const stats = await invoke('get_packet_statistics');
+          if (stats) {
+            setStatistics({
+              totalPackets: stats.total_packets || 0,
+              bytesPerSec: stats.bytes_per_sec || 0,
+              packetsPerSec: stats.packets_per_sec || 0,
+              protocolStats: {
+                tcp: stats.protocol_stats?.tcp || 0,
+                udp: stats.protocol_stats?.udp || 0,
+                arp: stats.protocol_stats?.arp || 0,
+                icmp: stats.protocol_stats?.icmp || 0,
+                other: stats.protocol_stats?.other || 0,
+                ethernet: stats.protocol_stats?.ethernet || 0,
+                ipv4: stats.protocol_stats?.ipv4 || 0,
+              }
+            });
+          }
+        } catch (error) {
+          console.error('获取统计信息失败:', error);
+        }
+        return;
+      }
+
+      try {
+        // 先获取统计信息
+        const stats = await invoke('get_packet_statistics');
+        if (stats) {
+          setStatistics({
+            totalPackets: stats.total_packets || 0,
+            bytesPerSec: stats.bytes_per_sec || 0,
+            packetsPerSec: stats.packets_per_sec || 0,
+            protocolStats: {
+              tcp: stats.protocol_stats?.tcp || 0,
+              udp: stats.protocol_stats?.udp || 0,
+              arp: stats.protocol_stats?.arp || 0,
+              icmp: stats.protocol_stats?.icmp || 0,
+              other: stats.protocol_stats?.other || 0,
+              ethernet: stats.protocol_stats?.ethernet || 0,
+              ipv4: stats.protocol_stats?.ipv4 || 0,
+            }
+          });
+        }
+
+        // 数据包获取数量
+        const maxCount = 100;
+        
+        // 更新调试信息
+        setDebugInfo(prev => ({ 
+          ...prev, 
+          apiCalls: prev.apiCalls + 1,
+          lastUpdate: new Date().toLocaleTimeString()
+        }));
+        
+        const newPackets = await invoke('get_captured_packets', { maxCount });
+        
+        if (newPackets && newPackets.length > 0) {
+          // 更新调试信息
+          setDebugInfo(prev => ({ 
+            ...prev, 
+            packetsReceived: prev.packetsReceived + newPackets.length
+          }));
+          
+          setPackets(prev => {
+            // 限制显示的数据包数量，避免渲染太多DOM元素
+            const combined = [...newPackets, ...prev].slice(0, maxPackets);
+            return combined;
+          });
+        }
+      } catch (error) {
+        console.error('获取数据包失败:', error);
+        // 如果API调用失败，不要停止嗅探，但减少调用频率
+      }
+    }, 800);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isSniffing, maxPackets, pauseUpdates]);
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
+      {/* 头部控制区 */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+            网络嗅探
+          </h2>
+          {selectedInterface && (
+            <span className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+              {selectedInterface.name}
+            </span>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {isSniffing ? (
+            <button
+              onClick={stopSniffing}
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6v4H9z" />
+              </svg>
+              停止嗅探
+            </button>
+          ) : (
+            <button
+              onClick={startSniffing}
+              disabled={!selectedInterface}
+              className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-md flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8" />
+              </svg>
+              开始嗅探
+            </button>
+          )}
+          
+          <button
+            onClick={clearData}
+            className="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md"
+          >
+            清空
+          </button>
+          
+          {isSniffing && (
+            <button
+              onClick={() => setPauseUpdates(!pauseUpdates)}
+              className={`px-3 py-2 text-white rounded-md ${
+                pauseUpdates 
+                  ? 'bg-yellow-500 hover:bg-yellow-600' 
+                  : 'bg-purple-500 hover:bg-purple-600'
+              }`}
+            >
+              {pauseUpdates ? '继续更新' : '暂停更新'}
+            </button>
+          )}
+          
+        </div>
+      </div>
+
+      {/* 统计信息 */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">总包数</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            {statistics.totalPackets.toLocaleString()}
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-4">
+          <div className="text-sm text-blue-600 dark:text-blue-400">TCP</div>
+          <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+            {statistics.protocolStats.tcp}
+          </div>
+        </div>
+        
+        <div className="bg-green-50 dark:bg-green-900 rounded-lg p-4">
+          <div className="text-sm text-green-600 dark:text-green-400">UDP</div>
+          <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+            {statistics.protocolStats.udp}
+          </div>
+        </div>
+        
+        <div className="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4">
+          <div className="text-sm text-yellow-600 dark:text-yellow-400">ARP</div>
+          <div className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
+            {statistics.protocolStats.arp}
+          </div>
+        </div>
+        
+        <div className="bg-red-50 dark:bg-red-900 rounded-lg p-4">
+          <div className="text-sm text-red-600 dark:text-red-400">ICMP</div>
+          <div className="text-2xl font-bold text-red-900 dark:text-red-100">
+            {statistics.protocolStats.icmp}
+          </div>
+        </div>
+      </div>
+
+      {/* 过滤器 */}
+      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">过滤器</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <select
+            value={filters.protocol}
+            onChange={(e) => setFilters(prev => ({ ...prev, protocol: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+          >
+            <option value="all">所有协议</option>
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="arp">ARP</option>
+            <option value="icmp">ICMP</option>
+          </select>
+          
+          <input
+            type="text"
+            placeholder="源MAC地址"
+            value={filters.srcMac}
+            onChange={(e) => setFilters(prev => ({ ...prev, srcMac: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+          />
+          
+          <input
+            type="text"
+            placeholder="目标MAC地址"
+            value={filters.dstMac}
+            onChange={(e) => setFilters(prev => ({ ...prev, dstMac: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+          />
+          
+          <input
+            type="text"
+            placeholder="源IP地址"
+            value={filters.srcIp}
+            onChange={(e) => setFilters(prev => ({ ...prev, srcIp: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+          />
+          
+          <input
+            type="text"
+            placeholder="目标IP地址"
+            value={filters.dstIp}
+            onChange={(e) => setFilters(prev => ({ ...prev, dstIp: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+          />
+          
+          <input
+            type="text"
+            placeholder="端口"
+            value={filters.port}
+            onChange={(e) => setFilters(prev => ({ ...prev, port: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* 数据包列表 */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 border-b border-gray-200 dark:border-gray-600">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                数据包列表 ({filteredPackets.length})
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                API调用: {debugInfo.apiCalls} | 接收: {debugInfo.packetsReceived} | 最后更新: {debugInfo.lastUpdate}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={autoScroll}
+                  onChange={(e) => setAutoScroll(e.target.checked)}
+                  className="rounded"
+                />
+                自动滚动
+              </label>
+              <select
+                value={maxPackets}
+                onChange={(e) => setMaxPackets(parseInt(e.target.value))}
+                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-800"
+              >
+                <option value={100}>100条</option>
+                <option value={500}>500条</option>
+                <option value={1000}>1000条</option>
+                <option value={5000}>5000条</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <div className="max-h-96 overflow-y-auto">
+          {filteredPackets.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+              {isSniffing ? '等待数据包...' : '点击"开始嗅探"开始捕获网络数据包'}
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {filteredPackets.map((packet) => (
+                <div
+                  key={packet.id}
+                  className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  onClick={() => setShowDetails(showDetails === packet.id ? null : packet.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatTime(packet.timestamp)}
+                      </span>
+                      <span className={`px-2 py-1 text-xs rounded ${getProtocolColor(packet.protocol)}`}>
+                        {packet.protocol.toUpperCase()}
+                      </span>
+                      <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
+                        {packet.src_ip || packet.srcIp}:{packet.src_port || packet.srcPort || '—'} → {packet.dst_ip || packet.dstIp}:{packet.dst_port || packet.dstPort || '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{formatBytes(packet.size)}</span>
+                      <svg 
+                        className={`w-4 h-4 transition-transform ${showDetails === packet.id ? 'rotate-180' : ''}`} 
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  {showDetails === packet.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-600 dark:text-gray-400">源MAC地址:</div>
+                          <div className="font-mono text-gray-900 dark:text-gray-100">{packet.src_mac || packet.srcMac}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600 dark:text-gray-400">目标MAC地址:</div>
+                          <div className="font-mono text-gray-900 dark:text-gray-100">{packet.dst_mac || packet.dstMac}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600 dark:text-gray-400">数据包大小:</div>
+                          <div className="text-gray-900 dark:text-gray-100">{formatBytes(packet.size)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600 dark:text-gray-400">信息:</div>
+                          <div className="text-gray-900 dark:text-gray-100">{packet.info}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NetworkSniffer;

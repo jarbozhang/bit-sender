@@ -2,8 +2,9 @@
 
 mod network;
 
-use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap};
+use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap, SnifferState, MonitorState};
 use network::interface::InterfaceInfo;
+use network::{SnifferManager, CapturedPacket, PacketStatistics, CaptureFilters, MonitorManager, TestConfig, TestResult, MonitoringStatistics};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -275,6 +276,196 @@ fn stop_batch_send(task_id: String, state: State<'_, TaskMap>) -> bool {
     false
 }
 
+// 数据包嗅探相关命令
+#[tauri::command]
+async fn start_packet_capture(
+    interface_name: String,
+    filters: CaptureFilters,
+    sniffer_state: State<'_, SnifferState>
+) -> Result<String, String> {
+    let mut sniffer = sniffer_state.lock().map_err(|e| {
+        format!("获取嗅探器状态失败: {}", e)
+    })?;
+    
+    match sniffer.start_capture(interface_name.clone(), filters) {
+        Ok(()) => {
+            Ok(format!("开始在接口 {} 上进行数据包捕获", interface_name))
+        },
+        Err(e) => {
+            Err(format!("启动数据包捕获失败: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+async fn stop_packet_capture(sniffer_state: State<'_, SnifferState>) -> Result<String, String> {
+    let mut sniffer = sniffer_state.lock().map_err(|e| format!("获取嗅探器状态失败: {}", e))?;
+    sniffer.stop_capture();
+    Ok("数据包捕获已停止".to_string())
+}
+
+#[tauri::command]
+fn get_capture_status(sniffer_state: State<'_, SnifferState>) -> Result<bool, String> {
+    let sniffer = sniffer_state.lock().map_err(|e| format!("获取嗅探器状态失败: {}", e))?;
+    Ok(sniffer.is_running())
+}
+
+#[tauri::command]
+fn get_packet_statistics(sniffer_state: State<'_, SnifferState>) -> Option<PacketStatistics> {
+    if let Ok(sniffer) = sniffer_state.lock() {
+        sniffer.get_statistics()
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+fn get_captured_packets(
+    max_count: Option<usize>, 
+    sniffer_state: State<'_, SnifferState>,
+    monitor_state: State<'_, MonitorState>
+) -> Vec<CapturedPacket> {
+    let max_count = max_count.unwrap_or(100);
+    
+    if let Ok(sniffer) = sniffer_state.lock() {
+        let packets = sniffer.get_packets(max_count);
+        
+        // 将数据包转发给响应监控器处理
+        if let Ok(monitor) = monitor_state.lock() {
+            for packet in &packets {
+                monitor.process_received_packet(packet);
+            }
+        }
+        
+        packets
+    } else {
+        Vec::new()
+    }
+}
+
+#[tauri::command]
+fn get_filtered_packets(
+    max_count: Option<usize>,
+    protocol_filter: Option<String>,
+    sniffer_state: State<'_, SnifferState>,
+    monitor_state: State<'_, MonitorState>
+) -> Vec<CapturedPacket> {
+    let max_count = max_count.unwrap_or(100);
+    
+    if let Ok(sniffer) = sniffer_state.lock() {
+        let packets = sniffer.get_filtered_packets(
+            max_count, 
+            protocol_filter.as_deref()
+        );
+        
+        // 将数据包转发给响应监控器处理
+        if let Ok(monitor) = monitor_state.lock() {
+            for packet in &packets {
+                monitor.process_received_packet(packet);
+            }
+        }
+        
+        packets
+    } else {
+        Vec::new()
+    }
+}
+
+// 响应监控相关命令
+#[tauri::command]
+async fn start_response_monitoring(
+    interface_name: String,
+    test_config: TestConfig,
+    monitor_state: State<'_, MonitorState>,
+    sniffer_state: State<'_, SnifferState>
+) -> Result<String, String> {
+    // 调试信息已移除以避免崩溃
+    
+    // 首先启动数据包捕获以接收响应
+    {
+        let mut sniffer = sniffer_state.lock().map_err(|e| format!("获取嗅探器状态失败: {}", e))?;
+        
+        // 创建适合响应监控的捕获过滤器
+        // 先尝试捕获所有相关协议的数据包，不限制IP，以便调试
+        let filters = CaptureFilters {
+            protocol: Some(match test_config.test_type.as_str() {
+                "ping" => "icmp".to_string(),
+                "arp" => "arp".to_string(), 
+                "tcp_connect" => "tcp".to_string(),
+                "udp_echo" => "udp".to_string(),
+                _ => "icmp".to_string(), // 默认ICMP
+            }),
+            src_mac: None,
+            dst_mac: None,
+            src_ip: None, // 暂时不限制源IP，捕获所有ICMP数据包用于调试
+            dst_ip: None, // 不限制目标IP
+            port: None,
+        };
+        
+        // 调试信息已移除以避免崩溃
+        
+        // 启动数据包捕获
+        sniffer.start_capture(interface_name.clone(), filters).map_err(|e| {
+            format!("启动数据包捕获失败: {}", e)
+        })?;
+    }
+    
+    let monitor = monitor_state.lock().map_err(|e| format!("获取监控器状态失败: {}", e))?;
+    
+    match monitor.start_monitoring(interface_name.clone(), test_config) {
+        Ok(()) => {
+            Ok(format!("开始在接口 {} 上进行响应监控", interface_name))
+        },
+        Err(e) => {
+            Err(format!("启动响应监控失败: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+async fn stop_response_monitoring(
+    monitor_state: State<'_, MonitorState>,
+    sniffer_state: State<'_, SnifferState>
+) -> Result<String, String> {
+    // 停止响应监控
+    let monitor = monitor_state.lock().map_err(|e| format!("获取监控器状态失败: {}", e))?;
+    monitor.stop_monitoring();
+    
+    // 停止数据包捕获
+    {
+        let mut sniffer = sniffer_state.lock().map_err(|e| format!("获取嗅探器状态失败: {}", e))?;
+        sniffer.stop_capture();
+    }
+    
+    Ok("响应监控已停止".to_string())
+}
+
+#[tauri::command]
+fn get_monitoring_status(monitor_state: State<'_, MonitorState>) -> Result<bool, String> {
+    let monitor = monitor_state.lock().map_err(|e| format!("获取监控器状态失败: {}", e))?;
+    Ok(monitor.is_running())
+}
+
+#[tauri::command]
+fn get_monitoring_statistics(monitor_state: State<'_, MonitorState>) -> Option<MonitoringStatistics> {
+    if let Ok(monitor) = monitor_state.lock() {
+        monitor.get_statistics()
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
+fn get_test_results(max_count: Option<usize>, monitor_state: State<'_, MonitorState>) -> Vec<TestResult> {
+    let max_count = max_count.unwrap_or(50);
+    
+    if let Ok(monitor) = monitor_state.lock() {
+        monitor.get_test_results(max_count)
+    } else {
+        Vec::new()
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -282,13 +473,26 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(network::TaskMap::default())
+        .manage(SnifferState::new(Mutex::new(SnifferManager::new())))
+        .manage(MonitorState::new(Mutex::new(MonitorManager::new())))
         .invoke_handler(tauri::generate_handler![
             greet,
             send_packet,
             get_network_interfaces,
             start_batch_send,
             get_batch_send_status,
-            stop_batch_send
+            stop_batch_send,
+            start_packet_capture,
+            stop_packet_capture,
+            get_capture_status,
+            get_packet_statistics,
+            get_captured_packets,
+            get_filtered_packets,
+            start_response_monitoring,
+            stop_response_monitoring,
+            get_monitoring_status,
+            get_monitoring_statistics,
+            get_test_results
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

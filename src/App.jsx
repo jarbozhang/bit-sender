@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import PacketEditor from "./features/packetEditor";
+import NetworkSniffer from "./features/networkSniffer/NetworkSniffer";
+import ResponseMonitor from "./features/responseMonitor/ResponseMonitor";
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useSystemTheme } from "./hooks/useSystemTheme";
 import { ToastContainer } from "./components/Toast";
@@ -10,6 +12,7 @@ function AppContent() {
   useSystemTheme();
   const { toasts, removeToast } = useToast();
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
+  const [activeTab, setActiveTab] = useState('packet-editor');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex flex-col text-gray-800 dark:bg-gray-900 dark:text-gray-200">
@@ -22,9 +25,46 @@ function AppContent() {
               <span className="text-2xl font-bold text-blue-700 tracking-tight">比达发包器</span>
             </div>
             <div className="hidden md:flex gap-8">
-              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-blue-600 text-sm font-medium text-blue-700 focus:outline-none dark:text-blue-300 dark:border-blue-400">发送报文</a>
-              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">网口嗅探</a>
-              <a href="#" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-600 hover:border-blue-300 hover:text-blue-600 transition dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400">配置管理</a>
+              <button 
+                onClick={() => setActiveTab('packet-editor')}
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
+                  activeTab === 'packet-editor' 
+                    ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
+                    : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
+                }`}
+              >
+                发送报文
+              </button>
+              <button 
+                onClick={() => setActiveTab('network-sniffer')}
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
+                  activeTab === 'network-sniffer' 
+                    ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
+                    : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
+                }`}
+              >
+                网口嗅探
+              </button>
+              <button 
+                onClick={() => setActiveTab('response-monitor')}
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
+                  activeTab === 'response-monitor' 
+                    ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
+                    : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
+                }`}
+              >
+                响应监控
+              </button>
+              <button 
+                onClick={() => setActiveTab('config-manager')}
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
+                  activeTab === 'config-manager' 
+                    ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
+                    : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
+                }`}
+              >
+                配置管理
+              </button>
             </div>
             {/* 新增网卡选择入口 */}
             <button
@@ -39,15 +79,49 @@ function AppContent() {
       </nav>
       {/* 主内容区 */}
       <main className="flex-1 flex flex-col items-center py-10 dark:bg-gray-900 dark:text-gray-200">
-        <section className="w-full max-w-4xl flex flex-col gap-8">
-          {/* 报文编辑区 */}
-          <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
-            <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
-              <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
-              报文编辑
-            </h2>
-            <PacketEditor />
-          </div>
+        <section className="w-full max-w-6xl flex flex-col gap-8">
+          {activeTab === 'packet-editor' && (
+            <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
+              <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
+                <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
+                报文编辑
+              </h2>
+              <PacketEditor />
+            </div>
+          )}
+
+          {activeTab === 'network-sniffer' && (
+            <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
+              <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
+                <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
+                网口嗅探
+              </h2>
+              <NetworkSniffer />
+            </div>
+          )}
+
+          {activeTab === 'response-monitor' && (
+            <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
+              <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
+                <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
+                响应监控
+              </h2>
+              <ResponseMonitor />
+            </div>
+          )}
+
+          {activeTab === 'config-manager' && (
+            <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
+              <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
+                <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
+                配置管理
+              </h2>
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <p className="text-lg">配置管理功能即将到来...</p>
+                <p className="text-sm mt-2">用于管理网络配置、模板设置和应用偏好等</p>
+              </div>
+            </div>
+          )}
         </section>
       </main>
       {/* 底部版权 */}
