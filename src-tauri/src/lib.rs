@@ -2,9 +2,10 @@
 
 mod network;
 
-use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap, SnifferState, MonitorState};
+use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap, SnifferState, MonitorState, InterfaceManagerState};
 use network::interface::InterfaceInfo;
 use network::{SnifferManager, CapturedPacket, PacketStatistics, CaptureFilters, MonitorManager, TestConfig, TestResult, MonitoringStatistics};
+use network::InterfaceManager;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -66,13 +67,24 @@ fn get_network_interfaces() -> Result<Vec<InterfaceInfo>, String> {
 }
 
 #[tauri::command]
+fn check_admin_privileges(interface_manager: State<'_, InterfaceManagerState>) -> Result<bool, String> {
+    let manager = interface_manager.lock().map_err(|e| format!("无法获取接口管理器: {}", e))?;
+    match manager.check_admin_privileges() {
+        Ok(is_admin) => Ok(is_admin),
+        Err(e) => Err(format!("检查权限失败: {}", e)),
+    }
+}
+
+#[tauri::command]
 async fn start_batch_send(
     packet_data: serde_json::Value,
     interface_name: Option<String>,
     frequency: u32,
     stop_condition: Option<String>,
     stop_value: Option<u32>,
+    isolate_interface: Option<bool>,
     state: State<'_, TaskMap>,
+    interface_manager: State<'_, InterfaceManagerState>,
 ) -> Result<String, String> {
     use tokio::sync::oneshot;
 
@@ -104,6 +116,29 @@ async fn start_batch_send(
     let interface_name_clone = interface_name.clone();
     let stop_condition = stop_condition.unwrap_or_else(|| "manual".to_string());
     let stop_value = stop_value.unwrap_or(0);
+    let isolate_interface = isolate_interface.unwrap_or(false);
+
+    // 如果需要隔离网卡，先执行隔离操作
+    if isolate_interface {
+        if let Some(ref iface_name) = interface_name_clone {
+            let mut manager = interface_manager.lock().map_err(|e| format!("无法获取接口管理器: {}", e))?;
+            
+            // 检查权限
+            if !manager.check_admin_privileges().unwrap_or(false) {
+                return Err("网卡隔离功能需要管理员权限，请以管理员身份运行程序".to_string());
+            }
+            
+            // 执行隔离
+            if let Err(e) = manager.isolate_interface(iface_name) {
+                return Err(format!("隔离网卡失败: {}", e));
+            }
+        } else {
+            return Err("使用网卡隔离功能时必须指定网卡名称".to_string());
+        }
+    }
+
+    // 克隆接口管理器的引用以便在spawn_blocking中使用
+    let interface_manager_clone = interface_manager.inner().clone();
 
     // 将所有阻塞的发包逻辑都放到一个专用的阻塞线程中，避免饿死 Tokio 运行时
     tokio::task::spawn_blocking(move || {
@@ -247,12 +282,26 @@ async fn start_batch_send(
         let mut final_status = status_clone.lock().unwrap();
         final_status.running = false;
         final_status.sent_count = sent_count_clone.load(Ordering::Relaxed);
+        drop(final_status); // 释放锁
+        
+        // 如果使用了网卡隔离，恢复网卡配置
+        if isolate_interface {
+            if let Some(ref iface_name) = interface_name_clone {
+                if let Ok(mut manager) = interface_manager_clone.lock() {
+                    if let Err(e) = manager.restore_interface(iface_name) {
+                        eprintln!("恢复网卡配置失败: {}", e);
+                    }
+                }
+            }
+        }
     });
 
     let mut map = state.lock().unwrap();
     map.insert(task_id.clone(), BatchTaskHandle {
         status,
         stop_tx: Some(stop_tx),
+        interface_name: interface_name.clone(),
+        isolate_interface,
     });
 
     Ok(task_id)
@@ -265,11 +314,30 @@ fn get_batch_send_status(task_id: String, state: State<'_, TaskMap>) -> Option<B
 }
 
 #[tauri::command]
-fn stop_batch_send(task_id: String, state: State<'_, TaskMap>) -> bool {
+fn stop_batch_send(
+    task_id: String, 
+    state: State<'_, TaskMap>, 
+    interface_manager: State<'_, InterfaceManagerState>
+) -> bool {
     let mut map = state.lock().unwrap();
     if let Some(handle) = map.get_mut(&task_id) {
+        let should_restore = handle.isolate_interface;
+        let interface_name = handle.interface_name.clone();
+        
         if let Some(stop_tx) = handle.stop_tx.take() {
             let _ = stop_tx.send(());
+            
+            // 如果使用了网卡隔离，恢复网卡配置
+            if should_restore {
+                if let Some(ref iface_name) = interface_name {
+                    if let Ok(mut manager) = interface_manager.lock() {
+                        if let Err(e) = manager.restore_interface(iface_name) {
+                            eprintln!("手动停止时恢复网卡配置失败: {}", e);
+                        }
+                    }
+                }
+            }
+            
             return true;
         }
     }
@@ -479,10 +547,12 @@ pub fn run() {
         .manage(network::TaskMap::default())
         .manage(SnifferState::new(Mutex::new(SnifferManager::new())))
         .manage(MonitorState::new(Mutex::new(MonitorManager::new())))
+        .manage(InterfaceManagerState::new(Mutex::new(InterfaceManager::new().expect("无法初始化接口管理器"))))
         .invoke_handler(tauri::generate_handler![
             greet,
             send_packet,
             get_network_interfaces,
+            check_admin_privileges,
             start_batch_send,
             get_batch_send_status,
             stop_batch_send,

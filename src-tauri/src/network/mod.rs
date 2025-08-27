@@ -2,11 +2,13 @@ pub mod packet_builder;
 pub mod interface;
 pub mod packet_sniffer;
 pub mod response_monitor;
+pub mod interface_manager;
 
 pub use packet_builder::PacketBuilder;
 pub use interface::NetworkInterface;
 pub use packet_sniffer::{SnifferManager, CapturedPacket, PacketStatistics, CaptureFilters};
 pub use response_monitor::{MonitorManager, TestConfig, TestResult, MonitoringStatistics};
+pub use interface_manager::{InterfaceManager, InterfaceSnapshot};
 
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
@@ -59,8 +61,11 @@ pub struct BatchTaskStatus {
 pub struct BatchTaskHandle {
     pub status: Arc<Mutex<BatchTaskStatus>>,
     pub stop_tx: Option<oneshot::Sender<()>>,
+    pub interface_name: Option<String>,
+    pub isolate_interface: bool,
 }
 
 pub type TaskMap = Arc<Mutex<HashMap<String, BatchTaskHandle>>>;
 pub type SnifferState = Arc<Mutex<SnifferManager>>;
-pub type MonitorState = Arc<Mutex<MonitorManager>>; 
+pub type MonitorState = Arc<Mutex<MonitorManager>>;
+pub type InterfaceManagerState = Arc<Mutex<InterfaceManager>>; 

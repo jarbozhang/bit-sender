@@ -8,12 +8,48 @@ import { ToastContainer } from "./components/Toast";
 import ErrorDialog from "./components/ErrorDialog";
 import { useToast, ToastProvider } from "./contexts/ToastContext";
 import { NetworkInterfaceProvider, useNetworkInterface } from "./contexts/NetworkInterfaceContext";
+import { BatchTaskProvider, useBatchTask } from "./contexts/BatchTaskContext";
 
 function AppContent() {
   useSystemTheme();
   const { toasts, removeToast, errorDialog, closeErrorDialog } = useToast();
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
+  const { hasIsolatedTasks, stopAllTasks, getIsolatedTasks } = useBatchTask();
   const [activeTab, setActiveTab] = useState('packet-editor');
+  const [showTabSwitchConfirm, setShowTabSwitchConfirm] = useState(false);
+  const [pendingTab, setPendingTab] = useState(null);
+
+  // 处理页面切换
+  const handleTabSwitch = async (newTab) => {
+    if (newTab === activeTab) return;
+
+    // 如果有网卡隔离任务正在运行，需要用户确认
+    if (hasIsolatedTasks()) {
+      setPendingTab(newTab);
+      setShowTabSwitchConfirm(true);
+      return;
+    }
+
+    setActiveTab(newTab);
+  };
+
+  // 确认切换并停止任务
+  const confirmTabSwitch = async () => {
+    try {
+      await stopAllTasks();
+      setActiveTab(pendingTab);
+      setShowTabSwitchConfirm(false);
+      setPendingTab(null);
+    } catch (error) {
+      console.error('停止批量任务失败:', error);
+    }
+  };
+
+  // 取消切换
+  const cancelTabSwitch = () => {
+    setShowTabSwitchConfirm(false);
+    setPendingTab(null);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex flex-col text-gray-800 dark:bg-gray-900 dark:text-gray-200">
@@ -27,7 +63,7 @@ function AppContent() {
             </div>
             <div className="hidden md:flex gap-8">
               <button 
-                onClick={() => setActiveTab('packet-editor')}
+                onClick={() => handleTabSwitch('packet-editor')}
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
                   activeTab === 'packet-editor' 
                     ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
@@ -37,7 +73,7 @@ function AppContent() {
                 发送报文
               </button>
               <button 
-                onClick={() => setActiveTab('network-sniffer')}
+                onClick={() => handleTabSwitch('network-sniffer')}
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
                   activeTab === 'network-sniffer' 
                     ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
@@ -58,7 +94,7 @@ function AppContent() {
                 响应监控
               </button> */}
               <button 
-                onClick={() => setActiveTab('config-manager')}
+                onClick={() => handleTabSwitch('config-manager')}
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none transition ${
                   activeTab === 'config-manager' 
                     ? 'border-blue-600 text-blue-700 dark:text-blue-300 dark:border-blue-400' 
@@ -143,6 +179,47 @@ function AppContent() {
         message={errorDialog.message}
         details={errorDialog.details}
       />
+      
+      {/* 切换确认对话框 */}
+      {showTabSwitchConfirm && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[400px] max-w-[500px]">
+            <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
+              确认页面切换
+            </h3>
+            <div className="mb-4 text-sm text-gray-700 dark:text-gray-300">
+              <p className="mb-2">检测到您有正在运行的网卡隔离批量发送任务：</p>
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded p-2">
+                {getIsolatedTasks().map(task => (
+                  <div key={task.taskId} className="text-xs text-orange-600 dark:text-orange-400">
+                    🔒 网卡 {task.interfaceName} 正在隔离模式下发送数据包
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2">切换页面将会：</p>
+              <ul className="list-disc list-inside ml-2 text-xs text-gray-600 dark:text-gray-400">
+                <li>停止所有正在运行的批量发送任务</li>
+                <li>自动恢复被隔离的网卡配置</li>
+                <li>确保网络连接正常</li>
+              </ul>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button 
+                className="px-4 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-700"
+                onClick={cancelTabSwitch}
+              >
+                取消
+              </button>
+              <button 
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded"
+                onClick={confirmTabSwitch}
+              >
+                确认切换
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -151,7 +228,9 @@ function App() {
   return (
     <ToastProvider>
       <NetworkInterfaceProvider>
-        <AppContent />
+        <BatchTaskProvider>
+          <AppContent />
+        </BatchTaskProvider>
       </NetworkInterfaceProvider>
     </ToastProvider>
   );

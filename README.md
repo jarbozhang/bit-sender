@@ -76,14 +76,35 @@ pnpm tauri build
 ```
 构建产物在 `src-tauri/target/release/bundle/` 目录下。
 
-### 4. 主要功能入口
+### 4. 使用管理员权限运行（启用网卡独占功能）
+
+**macOS 用户**：
+```bash
+# 使用管理员权限运行构建的应用
+sudo ./src-tauri/target/release/bundle/macos/bit-sender.app/Contents/MacOS/bit-sender
+
+# 或在开发模式下测试
+sudo pnpm tauri dev
+```
+
+**Windows 用户**：
+- 右键点击应用，选择"以管理员身份运行"
+- 或在 PowerShell 中以管理员身份运行
+
+**Linux 用户**：
+```bash
+# 使用 sudo 运行
+sudo ./bit-sender
+```
+
+### 5. 主要功能入口
 
 - **报文编辑**：主界面填写协议字段，实时预览报文内容。
 - **网卡选择**：右上角"当前网卡"按钮，弹窗选择并显示流量图。
 - **测试发送**：填写完毕后点击"测试发送"，成功后可批量发送。
 - **批量发送**：设置发送频率，实时统计，支持终止任务。
 
-### 5. CI/CD 自动化
+### 6. CI/CD 自动化
 
 - 推送 tag 或手动触发 workflow，会自动为 macOS、Windows（如解开注释可支持 Linux）构建应用并上传产物。
 - 相关配置见 `.github/workflows/tauri.yml`。
