@@ -2,7 +2,7 @@
 
 # 自动发布脚本
 # 用法: ./scripts/release.sh [版本号]
-# 如果不提供版本号，自动递增minor版本
+# 如果不提供版本号，自动递增patch版本
 
 set -e  # 遇到错误立即退出
 
@@ -65,15 +65,15 @@ log_info "当前版本: $current_version"
 
 # 确定新版本号
 if [ -z "$1" ]; then
-    # 没有提供版本号，自动递增minor版本
+    # 没有提供版本号，自动递增patch版本
     new_version=$(node -e "
         const semver = '$current_version'.split('.');
         const major = parseInt(semver[0]);
         const minor = parseInt(semver[1]);
         const patch = parseInt(semver[2]);
-        console.log(\`\${major}.\${minor + 1}.0\`);
+        console.log(\`\${major}.\${minor}.\${patch + 1}\`);
     ")
-    log_info "自动递增minor版本: $new_version"
+    log_info "自动递增patch版本: $new_version"
 else
     version_arg=$1
     case $version_arg in
