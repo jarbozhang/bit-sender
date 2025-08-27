@@ -154,6 +154,9 @@ git add package.json
 if [ -f "src-tauri/Cargo.toml" ]; then
     git add src-tauri/Cargo.toml
 fi
+if [ -f "src-tauri/Cargo.lock" ]; then
+    git add src-tauri/Cargo.lock
+fi
 
 git commit -m "chore: bump version to $new_version
 
