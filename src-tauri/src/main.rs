@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    bit_sender_lib::run()
+    BitSender_lib::run()
 }
