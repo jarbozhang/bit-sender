@@ -255,7 +255,7 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                             {process.env.NODE_ENV === 'development' ? (
                               'sudo pnpm tauri dev'
                             ) : (
-                              'sudo ./src-tauri/target/release/bundle/macos/bit-sender.app/Contents/MacOS/bit-sender'
+                              'sudo ./src-tauri/target/release/bundle/macos/BitSender.app/Contents/MacOS/BitSender'
                             )}
                           </div>
                         </div>
@@ -269,7 +269,7 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
                           <div className="font-medium mb-1">Linux 用户请使用以下命令启动：</div>
                           <div className="font-mono text-xs bg-gray-800 text-green-400 p-1 rounded">
-                            sudo ./bit-sender
+                            sudo ./BitSender
                           </div>
                         </div>
                       )}

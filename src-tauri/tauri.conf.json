@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "bit-sender",
+  "productName": "BitSender",
   "version": "0.1.0",
-  "identifier": "com.bit-sender.app",
+  "identifier": "com.BitSender.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",

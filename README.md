@@ -1,4 +1,4 @@
-# 比达发包器（bit-sender）
+# 比达发包器（BitSender）
 
 ## 下载地址
 
@@ -18,9 +18,9 @@
 如果是 macOS 用户，安装完成后需要执行以下命令来移除应用的安全限制：
 
 ```bash
-xattr -cr /Applications/bit-sender.app
+xattr -cr /Applications/BitSender.app
 # 或者你下载的路径
-xattr -cr /path/to/bit-sender.app
+xattr -cr /path/to/BitSender.app
 ```
 
 
@@ -81,7 +81,7 @@ pnpm tauri build
 **macOS 用户**：
 ```bash
 # 使用管理员权限运行构建的应用
-sudo ./src-tauri/target/release/bundle/macos/bit-sender.app/Contents/MacOS/bit-sender
+sudo ./src-tauri/target/release/bundle/macos/BitSender.app/Contents/MacOS/BitSender
 
 # 或在开发模式下测试
 sudo pnpm tauri dev
@@ -94,7 +94,7 @@ sudo pnpm tauri dev
 **Linux 用户**：
 ```bash
 # 使用 sudo 运行
-sudo ./bit-sender
+sudo ./BitSender
 ```
 
 ### 5. 主要功能入口
