@@ -104,7 +104,32 @@ sudo ./bit-sender
 - **测试发送**：填写完毕后点击"测试发送"，成功后可批量发送。
 - **批量发送**：设置发送频率，实时统计，支持终止任务。
 
-### 6. CI/CD 自动化
+### 6. 自动化发布
+
+**一键发布脚本**：
+```bash
+# 自动递增minor版本并发布
+pnpm release
+
+# 指定版本类型
+pnpm release:patch   # 修复版本 (0.1.0 -> 0.1.1)
+pnpm release:minor   # 功能版本 (0.1.0 -> 0.2.0)
+pnpm release:major   # 重大版本 (0.1.0 -> 1.0.0)
+
+# 指定具体版本
+./scripts/release.sh 1.2.3
+```
+
+**功能特点**：
+- 自动更新 package.json 和 Cargo.toml 版本号
+- 创建 Git 标签并推送到远程仓库
+- 触发 GitHub Actions 自动构建和发布
+- 支持语义化版本管理
+- 完整的安全检查和确认流程
+
+详细使用说明请查看 [`scripts/README.md`](scripts/README.md)
+
+### 7. CI/CD 自动化
 
 - 推送 tag 或手动触发 workflow，会自动为 macOS、Windows（如解开注释可支持 Linux）构建应用并上传产物。
 - 相关配置见 `.github/workflows/tauri.yml`。
