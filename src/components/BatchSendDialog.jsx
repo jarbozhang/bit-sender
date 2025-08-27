@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useBatchTask } from "../contexts/BatchTaskContext";
+import CustomSelect from "./CustomSelect";
 
 const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetData, interfaceName }) => {
   const [frequency, setFrequency] = useState(1);
@@ -116,8 +117,8 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
             targetSpeed: s.speed,
             actualSpeed: duration > 0 ? Math.round(s.sent_count / duration) : 0,
             duration: duration,
-            startTime: new Date(startTime).toLocaleTimeString(),
-            endTime: new Date(endTime).toLocaleTimeString()
+            startTime: new Date(startTime).toLocaleTimeString('zh-CN', { hour12: false }),
+            endTime: new Date(endTime).toLocaleTimeString('zh-CN', { hour12: false })
           });
           setIsCompleted(true);
         }
@@ -147,8 +148,8 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
           targetSpeed: taskStatus.speed,
           actualSpeed: duration > 0 ? Math.round(taskStatus.sent_count / duration) : 0,
           duration: duration,
-          startTime: new Date(startTime).toLocaleTimeString(),
-          endTime: new Date(endTime).toLocaleTimeString(),
+          startTime: new Date(startTime).toLocaleTimeString('zh-CN', { hour12: false }),
+          endTime: new Date(endTime).toLocaleTimeString('zh-CN', { hour12: false }),
           stoppedManually: true
         });
         setIsCompleted(true);
@@ -181,42 +182,62 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
         {!isSending && !isCompleted && (
           <div className="mb-4 space-y-4">
             <div>
-              <label className="block mb-2 text-gray-700 dark:text-gray-300">每秒发送次数：</label>
-              <input
-                type="number"
-                min={1}
-                value={frequency}
-                onChange={e => setFrequency(Math.max(1, Number(e.target.value)))}
-                className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-              />
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">每秒发送次数：</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={1000000}
+                  value={frequency}
+                  onChange={e => setFrequency(Math.max(1, Math.min(1000000, Number(e.target.value))))}
+                  className="flex-1 border rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">次/秒</span>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                支持范围：1-1,000,000 次/秒，极高频率请确保系统性能充足
+              </div>
             </div>
             
             <div>
-              <label className="block mb-2 text-gray-700 dark:text-gray-300">终止条件：</label>
-              <select
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">终止条件：</label>
+              <CustomSelect
                 value={stopCondition}
                 onChange={e => setStopCondition(e.target.value)}
-                className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-              >
-                <option value="manual">手动停止</option>
-                <option value="duration">发送指定时长</option>
-                <option value="count">发送指定数量</option>
-              </select>
+                options={[
+                  { value: 'manual', label: '手动停止' },
+                  { value: 'duration', label: '发送指定时长' },
+                  { value: 'count', label: '发送指定数量' }
+                ]}
+                placeholder="选择终止条件"
+              />
             </div>
             
             {stopCondition !== 'manual' && (
               <div>
-                <label className="block mb-2 text-gray-700 dark:text-gray-300">
-                  {stopCondition === 'duration' ? '发送时长（秒）：' : '发送数量（个）：'}
+                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {stopCondition === 'duration' ? '发送时长：' : '发送数量：'}
                 </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={stopValue}
-                  onChange={e => setStopValue(Math.max(1, Number(e.target.value)))}
-                  className="border rounded px-2 py-1 w-full bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                  placeholder={stopCondition === 'duration' ? '例如：30' : '例如：1000'}
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={stopCondition === 'duration' ? 3600 : 1000000}
+                    value={stopValue}
+                    onChange={e => setStopValue(Math.max(1, Number(e.target.value)))}
+                    className="flex-1 border rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder={stopCondition === 'duration' ? '30' : '1000'}
+                  />
+                  <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    {stopCondition === 'duration' ? '秒' : '个'}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {stopCondition === 'duration' 
+                    ? '建议范围：1-3600 秒（1小时）' 
+                    : '建议范围：1-100万个数据包'
+                  }
+                </div>
               </div>
             )}
             
@@ -251,11 +272,11 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                       {platform === 'macos' && (
                         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
                           <div className="font-medium mb-1">macOS 用户请使用以下命令启动：</div>
-                          <div className="font-mono text-xs bg-gray-800 text-green-400 p-1 rounded">
+                          <div className="font-mono text-xs bg-gray-800 text-green-400 p-2 rounded break-all whitespace-pre-wrap">
                             {process.env.NODE_ENV === 'development' ? (
                               'sudo pnpm tauri dev'
                             ) : (
-                              'sudo ./src-tauri/target/release/bundle/macos/BitSender.app/Contents/MacOS/BitSender'
+                              'sudo /Applications/BitSender.app/Contents/MacOS/BitSender'
                             )}
                           </div>
                         </div>
@@ -322,7 +343,7 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
             
             <div className="flex justify-between">
               <span>开始时间：</span>
-              <span>{new Date(taskStatus.start_time * 1000).toLocaleTimeString()}</span>
+              <span>{new Date(taskStatus.start_time * 1000).toLocaleTimeString('zh-CN', { hour12: false })}</span>
             </div>
             <div className="flex justify-between">
               <span>已发送：</span>
@@ -330,7 +351,7 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
             </div>
             <div className="flex justify-between">
               <span>目标速度：</span>
-              <span>{taskStatus.speed} 次/秒</span>
+              <span>{taskStatus.speed.toLocaleString()} 次/秒</span>
             </div>
             
             {/* 进度条和剩余信息 */}
@@ -419,12 +440,12 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                 </div>
                 <div className="flex justify-between">
                   <span>目标速度：</span>
-                  <span>{completedStats.targetSpeed} 次/秒</span>
+                  <span>{completedStats.targetSpeed.toLocaleString()} 次/秒</span>
                 </div>
                 <div className="flex justify-between">
                   <span>实际速度：</span>
                   <span className="font-mono text-green-600 dark:text-green-400">
-                    {completedStats.actualSpeed} 次/秒
+                    {completedStats.actualSpeed.toLocaleString()} 次/秒
                   </span>
                 </div>
                 <div className="flex justify-between">

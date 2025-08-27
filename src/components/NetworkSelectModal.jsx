@@ -23,6 +23,22 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
     }
   }, [visible]);
 
+  // 处理ESC键关闭弹框
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && visible) {
+        onClose();
+      }
+    };
+
+    if (visible) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [visible, onClose]);
+
   if (!visible) return null;
 
   return (
@@ -52,9 +68,9 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
           })}
         </div>
         <div className="flex justify-end gap-2 mt-6">
-          <button className="px-4 py-1 rounded border" onClick={onClose}>取消</button>
+          <button className="px-4 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600" onClick={onClose}>取消</button>
           <button
-            className="bg-blue-500 text-white px-4 py-1 rounded disabled:opacity-50"
+            className="bg-blue-500 text-white px-4 py-1 rounded disabled:opacity-50 hover:bg-blue-600"
             disabled={!selected}
             onClick={() => { onSelect(interfaces.find(iface => iface.name === selected)); onClose(); }}
           >

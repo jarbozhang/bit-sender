@@ -3,6 +3,7 @@ import { PROTOCOLS } from './config';
 import { hexPreview } from './utils';
 import { usePacketEditor } from './usePacketEditor';
 import Button from '../../components/Button';
+import CustomSelect from '../../components/CustomSelect';
 import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
@@ -586,17 +587,15 @@ const PacketEditor = () => {
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <label className="font-medium text-gray-700 dark:text-gray-300">协议类型：</label>
-          <select
-            className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+          <CustomSelect
             value={proto.key}
             onChange={handleProtoChangeWrap}
-          >
-            {PROTOCOLS.map((p) => (
-              <option key={p.key} value={p.key} className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700">
-                {p.name}
-              </option>
-            ))}
-          </select>
+            options={PROTOCOLS.map((p) => ({
+              value: p.key,
+              label: p.name
+            }))}
+            placeholder="选择协议类型"
+          />
         </div>
         
         {/* 工具菜单按钮 */}

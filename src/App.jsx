@@ -157,30 +157,12 @@ function AppContent() {
                 配置管理
               </h2>
               
-              <div className="space-y-8">
-                {/* 主题设置区域 */}
-                <div className="border-b border-gray-200 dark:border-gray-600 pb-8">
-                  <ThemeToggle />
-                </div>
-                
-                {/* 其他配置项预留区域 */}
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <div className="max-w-md mx-auto">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                      <CubeTransparentIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2 text-gray-600 dark:text-gray-300">
-                      更多配置即将到来
-                    </h3>
-                    <p className="text-sm">
-                      我们正在开发更多实用的配置选项，包括：
-                    </p>
-                    <ul className="text-sm mt-3 space-y-1 text-gray-400 dark:text-gray-500">
-                      <li>• 网络接口偏好设置</li>
-                      <li>• 数据包模板管理</li>
-                      <li>• 应用行为自定义</li>
-                      <li>• 高级网络配置</li>
-                    </ul>
+              <div className="space-y-6">
+                {/* 外观设置 */}
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                  <h3 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-4">外观设置</h3>
+                  <div className="space-y-4">
+                    <ThemeToggle />
                   </div>
                 </div>
               </div>
