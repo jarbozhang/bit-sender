@@ -131,7 +131,7 @@ pnpm release:major   # 重大版本 (0.1.0 -> 1.0.0)
 
 ### 7. CI/CD 自动化
 
-- 推送 tag 或手动触发 workflow，会自动为 macOS、Windows（如解开注释可支持 Linux）构建应用并上传产物。
+- 推送 tag 或手动触发 workflow，会自动为 macOS、Windows、Linux 三个平台构建应用并上传产物。
 - 相关配置见 `.github/workflows/tauri.yml`。
 
 ---
@@ -148,12 +148,6 @@ pnpm release:major   # 重大版本 (0.1.0 -> 1.0.0)
 
 - **管理员权限**：发包操作需管理员/root 权限，部分平台需手动授权。
 - **macOS 签名**：如需正式分发，需配置 Apple 证书并签名、公证。
-
----
-
-## ⚠️ 关于 Ubuntu/Linux 构建支持
-
-> **注意：** 由于 Tauri v2 依赖的 `libsoup-3.0`、`javascriptcoregtk-4.1` 等系统库在 Ubuntu 22.04/24.04 官方仓库缺失，当前暂不支持在 Ubuntu/Linux 平台自动构建。如需 Linux 支持，建议关注 Tauri 官方后续适配进展，或尝试手动安装相关依赖、降级 Tauri 版本。
 
 ---
 
