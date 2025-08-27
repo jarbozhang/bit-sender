@@ -3,15 +3,16 @@ import PacketEditor from "./features/packetEditor";
 import NetworkSniffer from "./features/networkSniffer/NetworkSniffer";
 // import ResponseMonitor from "./features/responseMonitor/ResponseMonitor"; // 临时隐藏
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
-import { useSystemTheme } from "./hooks/useSystemTheme";
+import { useTheme } from "./hooks/useTheme";
 import { ToastContainer } from "./components/Toast";
 import ErrorDialog from "./components/ErrorDialog";
+import ThemeToggle from "./components/ThemeToggle";
 import { useToast, ToastProvider } from "./contexts/ToastContext";
 import { NetworkInterfaceProvider, useNetworkInterface } from "./contexts/NetworkInterfaceContext";
 import { BatchTaskProvider, useBatchTask } from "./contexts/BatchTaskContext";
 
 function AppContent() {
-  useSystemTheme();
+  useTheme(); // 初始化主题系统
   const { toasts, removeToast, errorDialog, closeErrorDialog } = useToast();
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const { hasIsolatedTasks, stopAllTasks, getIsolatedTasks } = useBatchTask();
@@ -155,9 +156,33 @@ function AppContent() {
                 <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
                 配置管理
               </h2>
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <p className="text-lg">配置管理功能即将到来...</p>
-                <p className="text-sm mt-2">用于管理网络配置、模板设置和应用偏好等</p>
+              
+              <div className="space-y-8">
+                {/* 主题设置区域 */}
+                <div className="border-b border-gray-200 dark:border-gray-600 pb-8">
+                  <ThemeToggle />
+                </div>
+                
+                {/* 其他配置项预留区域 */}
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="max-w-md mx-auto">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                      <CubeTransparentIcon className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-medium mb-2 text-gray-600 dark:text-gray-300">
+                      更多配置即将到来
+                    </h3>
+                    <p className="text-sm">
+                      我们正在开发更多实用的配置选项，包括：
+                    </p>
+                    <ul className="text-sm mt-3 space-y-1 text-gray-400 dark:text-gray-500">
+                      <li>• 网络接口偏好设置</li>
+                      <li>• 数据包模板管理</li>
+                      <li>• 应用行为自定义</li>
+                      <li>• 高级网络配置</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           )}
