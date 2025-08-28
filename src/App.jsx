@@ -4,15 +4,24 @@ import NetworkSniffer from "./features/networkSniffer/NetworkSniffer";
 // import ResponseMonitor from "./features/responseMonitor/ResponseMonitor"; // 临时隐藏
 import { CubeTransparentIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "./hooks/useTheme";
+import { useWindowTitle } from "./hooks/useWindowTitle";
 import { ToastContainer } from "./components/Toast";
 import ErrorDialog from "./components/ErrorDialog";
 import ThemeToggle from "./components/ThemeToggle";
+import LanguageToggle from "./components/LanguageToggle";
+import { useLanguage } from "./hooks/useLanguage";
+import { useTranslation } from "./locales";
 import { useToast, ToastProvider } from "./contexts/ToastContext";
 import { NetworkInterfaceProvider, useNetworkInterface } from "./contexts/NetworkInterfaceContext";
 import { BatchTaskProvider, useBatchTask } from "./contexts/BatchTaskContext";
 
 function AppContent() {
   useTheme(); // 初始化主题系统
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
+  
+  // 动态设置窗口标题
+  useWindowTitle(t('common.appTitle'));
   const { toasts, removeToast, errorDialog, closeErrorDialog } = useToast();
   const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const { hasIsolatedTasks, stopAllTasks, getIsolatedTasks } = useBatchTask();
@@ -60,7 +69,7 @@ function AppContent() {
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-2">
               <CubeTransparentIcon className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-blue-700 tracking-tight">比达发包器</span>
+              <span className="text-2xl font-bold text-blue-700 tracking-tight">{t('common.appTitle')}</span>
             </div>
             <div className="hidden md:flex gap-8">
               <button 
@@ -71,7 +80,7 @@ function AppContent() {
                     : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
                 }`}
               >
-                发送报文
+                {t('nav.packetEditor')}
               </button>
               <button 
                 onClick={() => handleTabSwitch('network-sniffer')}
@@ -81,7 +90,7 @@ function AppContent() {
                     : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
                 }`}
               >
-                网口嗅探
+                {t('nav.networkSniffer')}
               </button>
 {/* 响应监控页面临时隐藏，后续启用 */}
               {/* <button 
@@ -102,7 +111,7 @@ function AppContent() {
                     : 'border-transparent text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 dark:hover:border-blue-400'
                 }`}
               >
-                配置管理
+                {t('nav.configManager')}
               </button>
             </div>
             {/* 新增网卡选择入口 */}
@@ -110,7 +119,7 @@ function AppContent() {
               className="ml-4 px-3 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-blue-100 dark:hover:bg-blue-900 transition"
               onClick={() => setShowSelectModal(true)}
             >
-              当前网卡：{selectedInterface?.description || selectedInterface?.name || "未选择"}
+              {t('nav.currentInterface')}：{selectedInterface?.description || selectedInterface?.name || t('common.notSelected', '未选择')}
             </button>
             {/* 移动端菜单可后续补充 */}
           </div>
@@ -123,7 +132,7 @@ function AppContent() {
             <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
               <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
                 <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
-                报文编辑
+                {t('nav.packetEditor')}
               </h2>
               <PacketEditor />
             </div>
@@ -133,7 +142,7 @@ function AppContent() {
             <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
               <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
                 <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
-                网口嗅探
+                {t('nav.networkSniffer')}
               </h2>
               <NetworkSniffer />
             </div>
@@ -154,15 +163,23 @@ function AppContent() {
             <div className="bg-white rounded-2xl shadow-lg border border-blue-100 p-8 mb-4 dark:bg-gray-800 dark:border-gray-700">
               <h2 className="text-2xl font-semibold mb-6 text-blue-700 flex items-center gap-2 dark:text-blue-300">
                 <CubeTransparentIcon className="h-6 w-6 text-blue-400" />
-                配置管理
+                {t('config.title')}
               </h2>
               
               <div className="space-y-6">
                 {/* 外观设置 */}
                 <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
-                  <h3 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-4">外观设置</h3>
+                  <h3 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-4">{t('config.appearance')}</h3>
                   <div className="space-y-4">
                     <ThemeToggle />
+                  </div>
+                </div>
+
+                {/* 语言设置 */}
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4">
+                  <h3 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-4">{t('config.language')}</h3>
+                  <div className="space-y-4">
+                    <LanguageToggle />
                   </div>
                 </div>
               </div>
@@ -172,7 +189,7 @@ function AppContent() {
       </main>
       {/* 底部版权 */}
       <footer className="bg-white border-t border-blue-100 py-4 text-center text-gray-400 text-sm shadow-inner dark:bg-gray-900 dark:border-gray-700 dark:text-gray-500">
-        © 2025 比达发包器 | 基于 Tauri + React + Tailwind CSS
+        {t('footer.copyright')}
       </footer>
       
       {/* Toast 通知容器 */}
