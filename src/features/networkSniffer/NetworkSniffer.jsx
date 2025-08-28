@@ -2,14 +2,19 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
 import { useToast } from '../../contexts/ToastContext';
+import { useLanguage } from '../../hooks/useLanguage';
+import { useTranslation } from '../../locales';
 
 const NetworkSniffer = () => {
-  const { selectedInterface } = useNetworkInterface();
+  const { selectedInterface, setShowSelectModal } = useNetworkInterface();
   const { showSuccess, showError, showInfo, showSmartError } = useToast();
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
   
   // 嗅探状态
   const [isSniffing, setIsSniffing] = useState(false);
   const [packets, setPackets] = useState([]);
+  const [pendingSniffing, setPendingSniffing] = useState(false);
   const [statistics, setStatistics] = useState({
     totalPackets: 0,
     bytesPerSec: 0,
@@ -53,13 +58,9 @@ const NetworkSniffer = () => {
     renderTime: 0
   });
 
-  // 启动嗅探
-  const startSniffing = async () => {
-    if (!selectedInterface) {
-      showError('请先选择网络接口');
-      return;
-    }
-
+  const doStartSniffing = async () => {
+    if (!selectedInterface) return;
+    
     try {
       setIsSniffing(true);
       setPackets([]);
@@ -98,6 +99,19 @@ const NetworkSniffer = () => {
     }
   };
 
+  // 启动嗅探
+  const startSniffing = async () => {
+    console.log('🚀 startSniffing called, selectedInterface:', selectedInterface);
+    if (!selectedInterface) {
+      console.log('🚀 No interface selected, setting pending and showing modal');
+      setPendingSniffing(true);
+      setShowSelectModal(true);
+      return;
+    }
+    console.log('🚀 Interface selected, starting sniffing directly');
+    doStartSniffing();
+  };
+
   // 停止嗅探
   const stopSniffing = async () => {
     try {
@@ -108,7 +122,7 @@ const NetworkSniffer = () => {
       
     } catch (error) {
       console.error('停止嗅探失败:', error);
-      showSmartError('停止嗅探失败: ' + (error.message || error));
+      showSmartError(t('sniffer.stop') + ' failed: ' + (error.message || error));
     }
   };
 
@@ -195,6 +209,16 @@ const NetworkSniffer = () => {
     };
     return colors[protocol] || colors.other;
   };
+
+  // 监听选择网卡后自动开始嗅探
+  useEffect(() => {
+    console.log('🚀 useEffect triggered, pendingSniffing:', pendingSniffing, 'selectedInterface:', selectedInterface);
+    if (pendingSniffing && selectedInterface) {
+      console.log('🚀 Both conditions met, starting sniffing automatically');
+      setPendingSniffing(false);
+      doStartSniffing();
+    }
+  }, [pendingSniffing, selectedInterface]);
 
   // 定时获取数据包和统计信息
   useEffect(() => {
@@ -294,7 +318,7 @@ const NetworkSniffer = () => {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-            网络嗅探
+            {t('sniffer.title')}
           </h2>
           {selectedInterface && (
             <span className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
@@ -313,18 +337,17 @@ const NetworkSniffer = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6v4H9z" />
               </svg>
-              停止嗅探
+              {t('sniffer.stop')}
             </button>
           ) : (
             <button
               onClick={startSniffing}
-              disabled={!selectedInterface}
-              className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-md flex items-center gap-2"
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8" />
               </svg>
-              开始嗅探
+              {t('sniffer.start')}
             </button>
           )}
           
@@ -332,7 +355,7 @@ const NetworkSniffer = () => {
             onClick={clearData}
             className="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md"
           >
-            清空
+            {t('common.clear')}
           </button>
           
           {isSniffing && (
@@ -344,7 +367,7 @@ const NetworkSniffer = () => {
                   : 'bg-purple-500 hover:bg-purple-600'
               }`}
             >
-              {pauseUpdates ? '继续更新' : '暂停更新'}
+              {pauseUpdates ? t('common.resume') + '更新' : t('common.pause') + '更新'}
             </button>
           )}
           
@@ -354,7 +377,7 @@ const NetworkSniffer = () => {
       {/* 统计信息 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">总包数</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">{t('sniffer.total')}包数</div>
           <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {statistics.totalPackets.toLocaleString()}
           </div>
@@ -403,7 +426,7 @@ const NetworkSniffer = () => {
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            过滤器
+            {t('sniffer.filters')}
             {/* 显示当前激活的过滤器数量 */}
             {(filters.protocol !== 'all' || filters.srcMac || filters.dstMac || filters.srcIp || filters.dstIp || filters.port) && (
               <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">
@@ -419,7 +442,7 @@ const NetworkSniffer = () => {
             )}
           </h3>
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            {showFilters ? '点击收起' : '点击展开'}
+            {showFilters ? t('sniffer.clickToCollapse') : t('sniffer.clickToExpand')}
           </span>
         </div>
         
@@ -432,7 +455,7 @@ const NetworkSniffer = () => {
                 onChange={(e) => setFilters(prev => ({ ...prev, protocol: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
               >
-                <option value="all">所有协议</option>
+                <option value="all">{t('sniffer.allProtocols')}</option>
                 <option value="tcp">TCP</option>
                 <option value="udp">UDP</option>
                 <option value="arp">ARP</option>
@@ -441,7 +464,7 @@ const NetworkSniffer = () => {
               
               <input
                 type="text"
-                placeholder="源MAC地址"
+                placeholder={t('sniffer.sourceMac')}
                 value={filters.srcMac}
                 onChange={(e) => setFilters(prev => ({ ...prev, srcMac: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
@@ -449,7 +472,7 @@ const NetworkSniffer = () => {
               
               <input
                 type="text"
-                placeholder="目标MAC地址"
+                placeholder={t('sniffer.destMac')}
                 value={filters.dstMac}
                 onChange={(e) => setFilters(prev => ({ ...prev, dstMac: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
@@ -457,7 +480,7 @@ const NetworkSniffer = () => {
               
               <input
                 type="text"
-                placeholder="源IP地址"
+                placeholder={t('sniffer.sourceIp')}
                 value={filters.srcIp}
                 onChange={(e) => setFilters(prev => ({ ...prev, srcIp: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
@@ -465,7 +488,7 @@ const NetworkSniffer = () => {
               
               <input
                 type="text"
-                placeholder="目标IP地址"
+                placeholder={t('sniffer.destIp')}
                 value={filters.dstIp}
                 onChange={(e) => setFilters(prev => ({ ...prev, dstIp: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
@@ -473,7 +496,7 @@ const NetworkSniffer = () => {
               
               <input
                 type="text"
-                placeholder="端口"
+                placeholder={t('sniffer.port')}
                 value={filters.port}
                 onChange={(e) => setFilters(prev => ({ ...prev, port: e.target.value }))}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm"
@@ -494,7 +517,7 @@ const NetworkSniffer = () => {
                   })}
                   className="px-3 py-1 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md transition-colors"
                 >
-                  清空过滤器
+                  {t('sniffer.clearFilters')}
                 </button>
               </div>
             )}
@@ -508,10 +531,10 @@ const NetworkSniffer = () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                数据包列表 ({filteredPackets.length})
+                {t('sniffer.packets')}列表 ({filteredPackets.length})
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                API调用: {debugInfo.apiCalls} | 接收: {debugInfo.packetsReceived} | 渲染: {debugInfo.renderTime.toFixed(2)}ms | 显示: {visiblePackets.length}/{filteredPackets.length} | 最后更新: {debugInfo.lastUpdate}
+                {t('sniffer.showing')}: {visiblePackets.length}/{filteredPackets.length} | {t('sniffer.lastUpdated')}: {debugInfo.lastUpdate}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -522,22 +545,22 @@ const NetworkSniffer = () => {
                   onChange={(e) => setAutoScroll(e.target.checked)}
                   className="rounded"
                 />
-                自动滚动
+                {t('sniffer.autoScroll')}
               </label>
               <select
                 value={maxPackets}
                 onChange={(e) => setMaxPackets(parseInt(e.target.value))}
                 className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-800"
               >
-                <option value={100}>100条</option>
-                <option value={500}>500条</option>
-                <option value={1000}>1000条</option>
-                <option value={2000}>2000条 (优化)</option>
-                <option value={5000}>5000条 (虚拟滚动)</option>
-                <option value={10000}>10000条 (虚拟滚动)</option>
+                <option value={100}>100{t('sniffer.items')}</option>
+                <option value={500}>500{t('sniffer.items')}</option>
+                <option value={1000}>1000{t('sniffer.items')}</option>
+                <option value={2000}>2000{t('sniffer.items')} ({t('sniffer.optimized')})</option>
+                <option value={5000}>5000{t('sniffer.items')} ({t('sniffer.virtualScroll')})</option>
+                <option value={10000}>10000{t('sniffer.items')} ({t('sniffer.virtualScroll')})</option>
               </select>
               <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                {maxPackets > 1000 ? '虚拟滚动已启用' : ''}
+                {maxPackets > 1000 ? t('sniffer.virtualScrollEnabled') : ''}
               </span>
             </div>
           </div>
@@ -550,7 +573,7 @@ const NetworkSniffer = () => {
         >
           {filteredPackets.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              {isSniffing ? '等待数据包...' : '点击"开始嗅探"开始捕获网络数据包'}
+              {isSniffing ? t('sniffer.waiting') : t('sniffer.clickToStart')}
             </div>
           ) : (
             <div 
@@ -578,6 +601,7 @@ const NetworkSniffer = () => {
                       formatTime={formatTime}
                       formatBytes={formatBytes}
                       getProtocolColor={getProtocolColor}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -597,7 +621,8 @@ const PacketRow = React.memo(({
   onToggleDetails, 
   formatTime, 
   formatBytes, 
-  getProtocolColor 
+  getProtocolColor,
+  t 
 }) => {
   return (
     <div
@@ -632,19 +657,19 @@ const PacketRow = React.memo(({
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <div className="text-gray-600 dark:text-gray-400">源MAC地址:</div>
+              <div className="text-gray-600 dark:text-gray-400">{t('sniffer.sourceMac')}:</div>
               <div className="font-mono text-gray-900 dark:text-gray-100">{packet.src_mac || packet.srcMac}</div>
             </div>
             <div>
-              <div className="text-gray-600 dark:text-gray-400">目标MAC地址:</div>
+              <div className="text-gray-600 dark:text-gray-400">{t('sniffer.destMac')}:</div>
               <div className="font-mono text-gray-900 dark:text-gray-100">{packet.dst_mac || packet.dstMac}</div>
             </div>
             <div>
-              <div className="text-gray-600 dark:text-gray-400">数据包大小:</div>
+              <div className="text-gray-600 dark:text-gray-400">{t('sniffer.packetSize')}:</div>
               <div className="text-gray-900 dark:text-gray-100">{formatBytes(packet.size)}</div>
             </div>
             <div>
-              <div className="text-gray-600 dark:text-gray-400">信息:</div>
+              <div className="text-gray-600 dark:text-gray-400">{t('sniffer.info')}:</div>
               <div className="text-gray-900 dark:text-gray-100">{packet.info}</div>
             </div>
           </div>

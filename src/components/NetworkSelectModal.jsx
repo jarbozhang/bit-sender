@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNetwork } from '../hooks/useNetwork';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../locales';
 
 const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
   const { getNetworkInterfaces } = useNetwork();
@@ -7,6 +9,8 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
 
   useEffect(() => {
     if (visible) {
@@ -17,7 +21,7 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
           setInterfaces(list);
         })
         .catch((e) => {
-          setError(e.message || '获取网卡失败');
+          setError(e.message || t('networkSelect.error'));
         })
         .finally(() => setLoading(false));
     }
@@ -44,8 +48,8 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[400px]">
-        <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">选择发送网卡</h2>
-        {loading && <div className="text-gray-500 mb-2">正在加载网卡列表...</div>}
+        <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">{t('networkSelect.title')}</h2>
+        {loading && <div className="text-gray-500 mb-2">{t('networkSelect.loading')}</div>}
         {error && <div className="text-red-500 mb-2">{error}</div>}
         <div className="max-h-60 overflow-y-auto">
           {interfaces.map((iface) => {
@@ -61,20 +65,20 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
                 }}
               >
                 <span className="font-bold text-gray-900 dark:text-gray-100">{iface.description || iface.name}</span>
-                <span className="text-xs text-gray-500">MAC: {iface.mac || "未知"}</span>
-                <span className="text-xs text-gray-500">IP: {ipv4 || "无IPv4"}</span>
+                <span className="text-xs text-gray-500">{t('networkSelect.mac')}: {iface.mac || t('networkSelect.unknown')}</span>
+                <span className="text-xs text-gray-500">{t('networkSelect.ip')}: {ipv4 || t('networkSelect.noIPv4')}</span>
               </div>
             );
           })}
         </div>
         <div className="flex justify-end gap-2 mt-6">
-          <button className="px-4 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600" onClick={onClose}>取消</button>
+          <button className="px-4 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600" onClick={onClose}>{t('common.cancel')}</button>
           <button
             className="bg-blue-500 text-white px-4 py-1 rounded disabled:opacity-50 hover:bg-blue-600"
             disabled={!selected}
             onClick={() => { onSelect(interfaces.find(iface => iface.name === selected)); onClose(); }}
           >
-            确定
+            {t('common.confirm')}
           </button>
         </div>
       </div>

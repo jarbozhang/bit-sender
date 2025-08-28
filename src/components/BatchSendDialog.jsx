@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useBatchTask } from "../contexts/BatchTaskContext";
+import { useLanguage } from "../hooks/useLanguage";
+import { useTranslation } from "../locales";
 import CustomSelect from "./CustomSelect";
 
 const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetData, interfaceName }) => {
@@ -16,6 +18,8 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
   const [platform, setPlatform] = useState(null);
   const timerRef = useRef(null);
   const { addTask, removeTask } = useBatchTask();
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
 
   useEffect(() => {
     if (!visible) {
@@ -175,14 +179,14 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[400px] max-w-[500px]">
         <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
-          {isCompleted ? '批量发送完成' : '批量发送设置'}
+          {isCompleted ? t('batchSend.completed') : t('batchSend.title')}
         </h2>
         
         {/* 设置界面 */}
         {!isSending && !isCompleted && (
           <div className="mb-4 space-y-4">
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">每秒发送次数：</label>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('batchSend.frequency')}：</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -192,24 +196,24 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                   onChange={e => setFrequency(Math.max(1, Math.min(1000000, Number(e.target.value))))}
                   className="flex-1 border rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
-                <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">次/秒</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{t('batchSend.frequencyUnit')}</span>
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                支持范围：1-1,000,000 次/秒，极高频率请确保系统性能充足
+                {t('batchSend.frequencyHint')}
               </div>
             </div>
             
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">终止条件：</label>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t('batchSend.stopCondition')}：</label>
               <CustomSelect
                 value={stopCondition}
                 onChange={e => setStopCondition(e.target.value)}
                 options={[
-                  { value: 'manual', label: '手动停止' },
-                  { value: 'duration', label: '发送指定时长' },
-                  { value: 'count', label: '发送指定数量' }
+                  { value: 'manual', label: t('batchSend.manual') },
+                  { value: 'duration', label: t('batchSend.duration') },
+                  { value: 'count', label: t('batchSend.count') }
                 ]}
-                placeholder="选择终止条件"
+                placeholder={t('batchSend.selectStopCondition')}
               />
             </div>
             

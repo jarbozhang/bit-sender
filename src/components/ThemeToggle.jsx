@@ -1,19 +1,23 @@
 import React from 'react';
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../hooks/useTheme';
+import { useLanguage } from '../hooks/useLanguage';
+import { useTranslation } from '../locales';
 
 const ThemeToggle = () => {
   const { theme, setTheme } = useTheme();
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
 
   const themes = [
-    { key: 'light', label: '浅色', icon: SunIcon },
-    { key: 'dark', label: '深色', icon: MoonIcon },
-    { key: 'system', label: '跟随系统', icon: ComputerDesktopIcon }
+    { key: 'light', label: t('theme.light'), icon: SunIcon },
+    { key: 'dark', label: t('theme.dark'), icon: MoonIcon },
+    { key: 'system', label: t('theme.system'), icon: ComputerDesktopIcon }
   ];
 
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">主题模式</span>
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('config.theme')}</span>
       <div className="flex items-center gap-2">
         {themes.map((themeOption) => {
           const Icon = themeOption.icon;

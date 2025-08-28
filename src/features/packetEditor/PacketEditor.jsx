@@ -7,6 +7,8 @@ import CustomSelect from '../../components/CustomSelect';
 import { useToast } from '../../contexts/ToastContext';
 import { useNetwork } from '../../hooks/useNetwork';
 import { useNetworkInterface } from '../../contexts/NetworkInterfaceContext';
+import { useLanguage } from '../../hooks/useLanguage';
+import { useTranslation } from '../../locales';
 import BatchSendDialog from '../../components/BatchSendDialog';
 import { FIELD_DESCRIPTIONS } from './fieldDescriptions';
 import { parseHexDump, generateHexDump, isValidHexString, detectProtocolFromHex, parsePacketFields } from './hexDumpUtils';
@@ -22,6 +24,8 @@ const PacketEditor = () => {
     handleRuleChange,
   } = usePacketEditor();
 
+  const { language } = useLanguage();
+  const { t } = useTranslation(language);
   const { showSuccess, showError, showInfo, showSmartError } = useToast();
   const { sendPacket, getNetworkInterfaces } = useNetwork();
   // 新增本机MAC/IP
@@ -168,7 +172,7 @@ const PacketEditor = () => {
       setTemplates(allTemplates);
     } catch (error) {
       console.error('加载模板失败:', error);
-      showError('加载模板失败');
+      showError(language === 'zh-CN' ? '加载模板失败' : 'Failed to load templates');
     }
   };
 
@@ -178,7 +182,7 @@ const PacketEditor = () => {
       setTemplates(newTemplates);
     } catch (error) {
       console.error('保存模板失败:', error);
-      showError('保存模板失败');
+      showError(language === 'zh-CN' ? '保存模板失败' : 'Failed to save templates');
     }
   };
 
@@ -244,7 +248,7 @@ const PacketEditor = () => {
       sentCount: 0,
       speed: frequency,
     });
-    showInfo(`已提交批量发送任务，频率：${frequency} 次/秒`);
+    showInfo(t('batchSend.taskStarted', {}, { frequency }));
   };
 
   // 结束任务
@@ -252,7 +256,7 @@ const PacketEditor = () => {
     setBatchStatus(null);
     setShowBatchDialog(false);
     setBatchMode('setup');
-    showInfo('批量发送任务已结束');
+    showInfo(t('batchSend.taskEnded'));
   };
 
   // 取消弹框
@@ -279,7 +283,7 @@ const PacketEditor = () => {
   const handleExportHexDump = async () => {
     const previewHex = hexPreview(fields, proto, localMac, localIp);
     if (!previewHex) {
-      showError('没有数据可导出，请先填写报文字段');
+      showError(t('export.noData'));
       return;
     }
     
@@ -289,7 +293,7 @@ const PacketEditor = () => {
       const hexDump = generateHexDump(hexString);
       
       // 生成默认文件名
-      const defaultFileName = `packet_${proto.name}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+      const defaultFileName = `packet_${proto.key}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
       
       // 使用 Tauri 的文件保存对话框
       const { save } = await import('@tauri-apps/plugin-dialog');
@@ -313,13 +317,13 @@ const PacketEditor = () => {
         const { writeTextFile } = await import('@tauri-apps/plugin-fs');
         await writeTextFile(filePath, hexDump);
         
-        showSuccess(`已导出到: ${filePath}`);
+        showSuccess(t('export.success', {}, { path: filePath }));
       }
       
     } catch (error) {
       console.error('导出失败:', error);
       const errorMessage = error?.message || error?.toString() || '未知错误';
-      showError('导出失败: ' + errorMessage);
+      showError(t('export.error', {}, { error: errorMessage }));
     }
   };
 
@@ -351,7 +355,7 @@ const PacketEditor = () => {
         // 处理导入的数据
         const success = processImportedData(fileContent);
         if (success) {
-          showSuccess('文件导入成功');
+          showSuccess(t('import.fileImportSuccess'));
           setShowImportDialog(false);
           setImportText('');
         }
@@ -360,14 +364,14 @@ const PacketEditor = () => {
     } catch (error) {
       console.error('文件导入失败:', error);
       const errorMessage = error?.message || error?.toString() || '未知错误';
-      showError('文件导入失败: ' + errorMessage);
+      showError(t('import.fileImportError') + ': ' + errorMessage);
     }
   };
 
   // 处理导入的数据（从文本框或文件）
   const processImportedData = (dataText) => {
     if (!dataText || !dataText.trim()) {
-      showError('没有数据可导入');
+      showError(t('import.noData'));
       return;
     }
 
@@ -376,12 +380,12 @@ const PacketEditor = () => {
       const hexData = parseHexDump(dataText);
       
       if (!hexData) {
-        showError('无法解析导入的数据，请检查格式');
+        showError(t('import.parseError'));
         return;
       }
 
       if (!isValidHexString(hexData)) {
-        showError('导入的数据不是有效的十六进制格式');
+        showError(t('import.invalidHex'));
         return;
       }
 
@@ -403,10 +407,10 @@ const PacketEditor = () => {
                   handleFieldChangeWrap(key, value);
                 }
               });
-              showInfo(`自动识别为 ${targetProto.name} 协议并回填字段`);
+              showInfo(t('import.autoDetectedWithFields', {}, { protocol: t(targetProto.nameKey) }));
             }, 100);
           } else {
-            showInfo(`自动识别为 ${targetProto.name} 协议`);
+            showInfo(t('import.autoDetected', {}, { protocol: t(targetProto.nameKey) }));
           }
         }
       } else {
@@ -418,7 +422,7 @@ const PacketEditor = () => {
       setImportText('');
       return true;
     } catch (error) {
-      showError('导入失败: ' + error.message);
+      showError((language === 'zh-CN' ? '导入失败: ' : 'Import failed: ') + error.message);
       return false;
     }
   };
@@ -452,13 +456,13 @@ const PacketEditor = () => {
   // 保存模板
   const handleSaveTemplate = () => {
     if (!templateName.trim()) {
-      showError('请输入模板名称');
+      showError(t('template.nameRequired'));
       return;
     }
 
     const currentPacket = getCurrentPacketData();
     if (!currentPacket.protocol || !currentPacket.fields) {
-      showError('当前没有有效的数据包配置');
+      showError(language === 'zh-CN' ? '当前没有有效的数据包配置' : 'No valid packet configuration available');
       return;
     }
 
@@ -499,10 +503,10 @@ const PacketEditor = () => {
     if (existingIndex >= 0) {
       newTemplates = [...templates];
       newTemplates[existingIndex] = { ...newTemplates[existingIndex], ...newTemplate, updatedAt: new Date().toISOString() };
-      showSuccess('模板已更新');
+      showSuccess(t('template.updateSuccess'));
     } else {
       newTemplates = [...templates, newTemplate];
-      showSuccess('模板已保存');
+      showSuccess(t('template.saveSuccess'));
     }
 
     saveTemplates(newTemplates);
@@ -516,15 +520,15 @@ const PacketEditor = () => {
   const handleLoadFromTemplateList = (template) => {
     handleLoadTemplate(template);
     setShowLoadDialog(false);
-    showInfo(`已加载模板：${template.name}`);
+    showInfo(t('template.loadSuccess') + `：${template.name}`);
   };
 
   // 删除模板
   const handleDeleteTemplate = (templateId) => {
-    if (window.confirm('确定要删除这个模板吗？')) {
+    if (window.confirm(t('template.deleteConfirm'))) {
       const newTemplates = templates.filter(t => t.id !== templateId);
       saveTemplates(newTemplates);
-      showSuccess('模板已删除');
+      showSuccess(t('template.deleteSuccess'));
     }
   };
 
@@ -586,15 +590,15 @@ const PacketEditor = () => {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <label className="font-medium text-gray-700 dark:text-gray-300">协议类型：</label>
+          <label className="font-medium text-gray-700 dark:text-gray-300">{t('packet.protocol')}：</label>
           <CustomSelect
             value={proto.key}
             onChange={handleProtoChangeWrap}
             options={PROTOCOLS.map((p) => ({
               value: p.key,
-              label: p.name
+              label: t(p.nameKey || p.name)
             }))}
-            placeholder="选择协议类型"
+            placeholder={t('packet.selectProtocol')}
           />
         </div>
         
@@ -607,7 +611,7 @@ const PacketEditor = () => {
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
-            工具
+            {t('packet.tools')}
             <svg className={`w-3 h-3 transition-transform duration-150 ${showToolsMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
@@ -619,7 +623,7 @@ const PacketEditor = () => {
               <div className="py-1">
                 {/* 模板管理 */}
                 <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
-                  模板管理
+                  {t('packet.templateManager')}
                 </div>
                 <button
                   onClick={() => {
@@ -631,7 +635,7 @@ const PacketEditor = () => {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  保存为模板
+                  {t('packet.saveTemplate')}
                 </button>
                 <button
                   onClick={() => {
@@ -643,7 +647,7 @@ const PacketEditor = () => {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                   </svg>
-                  加载模板 ({templates.length})
+                  {t('packet.loadTemplate')} ({templates.length})
                 </button>
 
                 {/* 分隔线 */}
@@ -651,7 +655,7 @@ const PacketEditor = () => {
 
                 {/* 导入导出 */}
                 <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
-                  数据交换
+                  {t('packet.dataExchange')}
                 </div>
                 <button
                   onClick={() => {
@@ -663,7 +667,7 @@ const PacketEditor = () => {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                   </svg>
-                  导入数据包
+                  {t('packet.importPacket')}
                 </button>
                 <button
                   onClick={() => {
@@ -675,7 +679,7 @@ const PacketEditor = () => {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  导出数据包
+                  {t('packet.exportPacket')}
                 </button>
               </div>
             </div>
@@ -687,8 +691,8 @@ const PacketEditor = () => {
         {headerFields.map((f) => (
           <div key={f.key} className="flex flex-col gap-1 relative">
             <label className="font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-              {f.label}
-              {FIELD_DESCRIPTIONS[f.key] && (
+              {t(f.labelKey || f.label)}
+              {t(`fields.${f.key}`, '') && (
                 <div className="relative inline-block">
                   <button
                     type="button"
@@ -702,7 +706,7 @@ const PacketEditor = () => {
                   {showTooltip === f.key && (
                     <div className="absolute z-50 w-80 p-3 mt-1 text-sm bg-gray-900 text-white rounded-lg shadow-lg border left-0 top-full">
                       <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 rotate-45"></div>
-                      {FIELD_DESCRIPTIONS[f.key]}
+                      {t(`fields.${f.key}`)}
                     </div>
                   )}
                 </div>
@@ -734,8 +738,8 @@ const PacketEditor = () => {
       {dataField && (
         <div className="mt-4 relative">
           <label className="font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-            {dataField.label}
-            {FIELD_DESCRIPTIONS[dataField.key] && (
+            {t(dataField.labelKey || dataField.label)}
+            {t(`fields.${dataField.key}`, '') && (
               <div className="relative inline-block">
                 <button
                   type="button"
@@ -749,7 +753,7 @@ const PacketEditor = () => {
                 {showTooltip === dataField.key && (
                   <div className="absolute z-50 w-80 p-3 mt-1 text-sm bg-gray-900 text-white rounded-lg shadow-lg border left-0 top-full">
                     <div className="absolute -top-1 left-3 w-2 h-2 bg-gray-900 rotate-45"></div>
-                    {FIELD_DESCRIPTIONS[dataField.key]}
+                    {t(`fields.${dataField.key}`)}
                   </div>
                 )}
               </div>
@@ -771,9 +775,9 @@ const PacketEditor = () => {
       )}
 
       <div className="mt-6">
-        <label className="font-medium text-gray-700 dark:text-gray-300">报文内容预览（16进制）</label>
+        <label className="font-medium text-gray-700 dark:text-gray-300">{t('packet.preview')}</label>
         <pre className="bg-gray-100 dark:bg-gray-900 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
-          {hexPreview(fields, proto, localMac, localIp) || <span className="text-gray-500">请填写字段以预览报文内容</span>}
+          {hexPreview(fields, proto, localMac, localIp) || <span className="text-gray-500">{t('packet.previewPlaceholder')}</span>}
         </pre>
       </div>
 
@@ -787,21 +791,21 @@ const PacketEditor = () => {
             onClick={handleTestSend}
             className="flex-1 sm:flex-none"
           >
-            {isTestSending ? "发送中..." : "测试发送"}
+            {isTestSending ? t('packet.sending') : t('packet.testSend')}
           </Button>
           <Button
             variant={isTested ? "primary" : "secondary"}
             size="lg"
             onClick={() => {
               if (!isTested) {
-                showError("测试发送成功之后才能批量发送");
+                showError(t('packet.testSuccess'));
                 return;
               }
               handleBatchSend();
             }}
             className={`flex-1 sm:flex-none ${!isTested ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            批量发送
+            {t('packet.batchSend')}
           </Button>
         </div>
       </div>
@@ -828,29 +832,29 @@ const PacketEditor = () => {
         >
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[500px] max-w-[700px] w-full mx-4">
             <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
-              导入 Hex Dump 数据
+              {t('import.title')}
             </h2>
             
             <div className="mb-4">
               <label className="block mb-2 text-sm text-gray-600 dark:text-gray-400">
-                输入方式：
+                {t('import.inputMethod')}：
               </label>
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={handleImportFromFile}
                   className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded flex items-center gap-2"
                 >
-                  📁 从文件导入
+                  📁 {t('import.fromFile')}
                 </button>
-                <span className="text-gray-400 dark:text-gray-500 flex items-center">或</span>
-                <span className="text-gray-600 dark:text-gray-400 flex items-center">手动粘贴</span>
+                <span className="text-gray-400 dark:text-gray-500 flex items-center">{t('import.or')}</span>
+                <span className="text-gray-600 dark:text-gray-400 flex items-center">{t('import.manualPaste')}</span>
               </div>
               
               <label className="block mb-2 text-sm text-gray-600 dark:text-gray-400">
-                粘贴 Wireshark 导出的 Hex Dump 格式数据：
+                {t('import.placeholder')}
               </label>
               <div className="text-xs text-gray-500 dark:text-gray-500 mb-2">
-                支持格式示例：<br/>
+                {t('import.formatExample')}<br/>
                 <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
                   0000  ff ff ff ff ff ff 00 11  22 33 44 55 08 06 00 01
                 </code>
@@ -877,14 +881,14 @@ const PacketEditor = () => {
                   setImportText('');
                 }}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
                 onClick={handleImport}
                 disabled={!importText.trim()}
               >
-                导入文本
+                {t('import.importText')}
               </button>
             </div>
           </div>
@@ -906,18 +910,18 @@ const PacketEditor = () => {
         >
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[500px] max-w-[600px] w-full mx-4">
             <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
-              保存数据包模板
+              {t('template.save')}
             </h2>
             
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  模板名称 <span className="text-red-500">*</span>
+                  {t('template.name')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder="例如：ARP请求模板、TCP SYN攻击"
+                  placeholder={t('template.namePlaceholder')}
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   maxLength={50}
@@ -926,11 +930,11 @@ const PacketEditor = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  描述
+                  {t('template.description')}
                 </label>
                 <textarea
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder="描述这个模板的用途和特点..."
+                  placeholder={t('template.descriptionPlaceholder')}
                   value={templateDescription}
                   onChange={(e) => setTemplateDescription(e.target.value)}
                   rows={3}
@@ -940,12 +944,12 @@ const PacketEditor = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  标签
+                  {t('template.tags')}
                 </label>
                 <input
                   type="text"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder="用逗号分隔，例如：测试,网络发现,常用"
+                  placeholder={t('template.tagsPlaceholder')}
                   value={templateTags}
                   onChange={(e) => setTemplateTags(e.target.value)}
                 />
@@ -962,14 +966,14 @@ const PacketEditor = () => {
                   setTemplateTags('');
                 }}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
                 onClick={handleSaveTemplate}
                 disabled={!templateName.trim()}
               >
-                保存模板
+                {t('common.save')}
               </button>
             </div>
           </div>
@@ -989,7 +993,7 @@ const PacketEditor = () => {
         >
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 min-w-[700px] max-w-[800px] w-full mx-4 max-h-[80vh] flex flex-col">
             <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
-              加载数据包模板
+              {t('template.load')}
             </h2>
             
             {/* 搜索框 */}
@@ -997,7 +1001,7 @@ const PacketEditor = () => {
               <input
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                placeholder="搜索模板名称、描述或标签..."
+                placeholder={t('template.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -1011,7 +1015,7 @@ const PacketEditor = () => {
                 template.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
               ).length === 0 ? (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  {templates.length === 0 ? '还没有保存的模板' : '没有找到匹配的模板'}
+                  {templates.length === 0 ? t('template.noTemplates') : t('template.noMatchingTemplates')}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1042,8 +1046,8 @@ const PacketEditor = () => {
                           )}
                           
                           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
-                            <span>创建: {new Date(template.createdAt).toLocaleDateString()}</span>
-                            <span>字段: {Object.keys(template.fields).length} 个</span>
+                            <span>{t('template.created')}: {new Date(template.createdAt).toLocaleDateString()}</span>
+                            <span>{t('template.fields')}: {Object.keys(template.fields).length} {language === 'zh-CN' ? '个' : ''}</span>
                             {template.tags.length > 0 && (
                               <div className="flex gap-1">
                                 {template.tags.map((tag, index) => (
@@ -1061,13 +1065,13 @@ const PacketEditor = () => {
                             className="px-3 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded"
                             onClick={() => handleLoadFromTemplateList(template)}
                           >
-                            加载
+                            {language === 'zh-CN' ? '加载' : 'Load'}
                           </button>
                           <button
                             className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded"
                             onClick={() => handleDeleteTemplate(template.id)}
                           >
-                            删除
+                            {t('common.delete')}
                           </button>
                         </div>
                       </div>
@@ -1085,7 +1089,7 @@ const PacketEditor = () => {
                   setSearchTerm('');
                 }}
               >
-                关闭
+                {t('common.close')}
               </button>
             </div>
           </div>
