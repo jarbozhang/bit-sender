@@ -50,12 +50,10 @@
     "chinese": "中文",
     "english": "English",
     "switchTitle": "Switch Language",
-    "switchMessage": "Switching language requires restarting the application to take full effect.",
+    "switchMessage": "Switching language requires restarting the application to take full effect. Please restart manually.",
     "restartRequired": "Restart Required",
-    "confirmSwitch": "Switch & Restart",
-    "autoRestart": "Application will restart automatically",
-    "restarting": "Restarting...",
-    "restartFailed": "Restart failed, please restart the application manually"
+    "confirmSwitch": "Confirm Switch",
+    "restartHint": "Please restart the application manually to complete language switch"
   },
   "packet": {
     "title": "Packet Editor",

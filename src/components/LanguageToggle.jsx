@@ -8,34 +8,17 @@ const LanguageToggle = () => {
   const { t } = useTranslation(language);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState(null);
-  const [isRestarting, setIsRestarting] = useState(false);
-
   const languages = [
     { key: 'zh-CN', label: t('language.chinese'), flag: '🇨🇳' },
     { key: 'en-US', label: t('language.english'), flag: '🇺🇸' }
   ];
 
-  const handleConfirmSwitch = async () => {
+  const handleConfirmSwitch = () => {
     if (pendingLanguage) {
-      try {
-        setIsRestarting(true);
-        // 先切换语言设置
-        setLanguage(pendingLanguage);
-        
-        // 稍微延迟以确保设置已保存
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 使用 Tauri API 重启应用
-        const { relaunch } = await import('@tauri-apps/api/app');
-        await relaunch();
-      } catch (error) {
-        console.error('重启失败:', error);
-        setIsRestarting(false);
-        // 如果重启失败，使用原生 alert 提示用户
-        alert(t('language.restartFailed'));
-        setShowConfirmDialog(false);
-        setPendingLanguage(null);
-      }
+      // 只切换语言设置，不执行重启
+      setLanguage(pendingLanguage);
+      setShowConfirmDialog(false);
+      setPendingLanguage(null);
     }
   };
 
@@ -129,13 +112,13 @@ const LanguageToggle = () => {
                   </p>
                 </div>
               </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
                 <div className="flex items-center">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
-                    {t('language.autoRestart')}
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                    {t('language.restartHint')}
                   </p>
                 </div>
               </div>
@@ -144,30 +127,15 @@ const LanguageToggle = () => {
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleCancelSwitch}
-                disabled={isRestarting}
-                className={`px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 transition-colors ${
-                  isRestarting 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleConfirmSwitch}
-                disabled={isRestarting}
-                className={`px-4 py-2 text-white rounded-md transition-colors flex items-center gap-2 ${
-                  isRestarting 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-blue-500 hover:bg-blue-600'
-                }`}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
               >
-                {isRestarting && (
-                  <svg className="animate-spin w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                )}
-                {isRestarting ? t('language.restarting') : t('language.confirmSwitch')}
+                {t('language.confirmSwitch')}
               </button>
             </div>
           </div>

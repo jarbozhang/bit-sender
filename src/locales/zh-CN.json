@@ -50,12 +50,10 @@
     "chinese": "中文",
     "english": "English",
     "switchTitle": "切换语言",
-    "switchMessage": "切换语言需要重启应用程序才能完全生效。",
+    "switchMessage": "切换语言需要重启应用程序才能完全生效，请手动重启应用。",
     "restartRequired": "需要重启应用",
-    "confirmSwitch": "切换并重启",
-    "autoRestart": "应用程序将自动重启",
-    "restarting": "正在重启...",
-    "restartFailed": "重启失败，请手动重启应用"
+    "confirmSwitch": "确认切换",
+    "restartHint": "请手动重启应用以完成语言切换"
   },
   "packet": {
     "title": "报文编辑",
