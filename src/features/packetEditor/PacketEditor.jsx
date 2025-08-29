@@ -13,6 +13,7 @@ import BatchSendDialog from '../../components/BatchSendDialog';
 import { FIELD_DESCRIPTIONS } from './fieldDescriptions';
 import { parseHexDump, generateHexDump, isValidHexString, detectProtocolFromHex, parsePacketFields } from './hexDumpUtils';
 import { initializeDefaultTemplates } from '../templateManager/defaultTemplates';
+import PacketSequenceManager from '../../components/PacketSequenceManager';
 
 const PacketEditor = () => {
   const {
@@ -58,6 +59,7 @@ const PacketEditor = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importText, setImportText] = useState('');
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showSequenceManager, setShowSequenceManager] = useState(false);
   
   // 模板管理状态 (从TemplateManager移过来)
   const [templates, setTemplates] = useState([]);
@@ -235,6 +237,12 @@ const PacketEditor = () => {
   }, [showImportDialog, showSaveDialog, showLoadDialog, showToolsMenu]);
 
   const handleBatchSend = () => {
+    // 检查是否选择了网卡
+    if (!selectedInterface) {
+      showError(t('sequence.noInterfaceSelected'));
+      return;
+    }
+    
     setShowBatchDialog(true);
     setBatchMode('setup');
   };
@@ -586,6 +594,74 @@ const PacketEditor = () => {
     };
   };
 
+  // 处理序列发送
+  const handleStartSequence = async (sequence) => {
+    try {
+      console.log('开始序列发送，selectedInterface:', selectedInterface);
+      console.log('sequence 数据:', sequence);
+      
+      // 检查是否选择了网卡
+      if (!selectedInterface) {
+        showError(t('sequence.noInterfaceSelected'));
+        return;
+      }
+
+      // 检查网卡名称
+      if (!selectedInterface.name) {
+        console.error('网卡对象缺少 name 属性:', selectedInterface);
+        showError('网卡信息不完整，请重新选择网卡');
+        return;
+      }
+
+      const { invoke } = await import('@tauri-apps/api/core');
+      
+      // 转换前端数据包格式为后端格式
+      const backendPackets = sequence.map(packet => ({
+        id: String(packet.id), // 确保 id 是字符串
+        name: packet.name,
+        protocol: packet.protocol,
+        fields: packet.fields || {},
+        payload: packet.payload ? packet.payload : null,
+        delay_ms: packet.delayMs || 100, // 将 delayMs 转换为 delay_ms
+        enabled: packet.enabled
+      }));
+      
+      // 构建后端API需要的序列数据结构  
+      const packetSequence = {
+        id: `seq_${Date.now()}`,
+        name: `数据包序列 - ${sequence.length}个包`,
+        packets: backendPackets,
+        loop_count: 1, // Option<u32>，1表示执行一次
+        loop_delay_ms: 0 // u64，默认无循环间隔
+      };
+
+      console.log('调用后端API，参数:', {
+        sequence: packetSequence,
+        interfaceName: selectedInterface.name,
+        isolateInterface: false
+      });
+
+      // 调用后端序列发送API
+      const taskId = await invoke('start_sequence_send', {
+        sequence: packetSequence,
+        interfaceName: selectedInterface.name,
+        isolateInterface: false // 默认不使用网卡隔离
+      });
+
+      console.log('序列发送成功，taskId:', taskId);
+      showSuccess(`${t('sequence.startSequence')}成功！任务ID: ${taskId}`);
+      setShowSequenceManager(false);
+      
+      // 可以在这里添加任务状态监控逻辑
+      
+    } catch (error) {
+      console.error('序列发送错误详情:', error);
+      console.error('错误类型:', typeof error);
+      console.error('错误属性:', Object.keys(error));
+      showError('序列发送启动失败: ' + (error.message || String(error)));
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-8">
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -648,6 +724,23 @@ const PacketEditor = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                   </svg>
                   {t('packet.loadTemplate')} ({templates.length})
+                </button>
+
+                {/* 分隔线 */}
+                <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+
+                {/* 序列发送 */}
+                <button
+                  onClick={() => {
+                    setShowSequenceManager(true);
+                    setShowToolsMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                  {t('sequence.title')}
                 </button>
 
                 {/* 分隔线 */}
@@ -1095,6 +1188,14 @@ const PacketEditor = () => {
           </div>
         </div>
       )}
+
+      {/* 数据包序列管理器 */}
+      <PacketSequenceManager
+        visible={showSequenceManager}
+        onClose={() => setShowSequenceManager(false)}
+        onStartSequence={handleStartSequence}
+        currentPacketData={getCurrentPacketData()}
+      />
     </div>
   );
 };

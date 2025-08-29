@@ -1,8 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
-mod network;
+pub mod network;
 
-use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap, SnifferState, MonitorState, InterfaceManagerState};
+use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap, SnifferState, MonitorState, InterfaceManagerState, SequencePacket, PacketSequence, SequenceTaskStatus, SequenceTaskHandle, SequenceTaskMap};
 use network::interface::InterfaceInfo;
 use network::{SnifferManager, CapturedPacket, PacketStatistics, CaptureFilters, MonitorManager, TestConfig, TestResult, MonitoringStatistics};
 use network::InterfaceManager;
@@ -344,6 +344,218 @@ fn stop_batch_send(
     false
 }
 
+// 序列发送相关命令
+#[tauri::command]
+async fn start_sequence_send(
+    sequence: PacketSequence,
+    interface_name: Option<String>,
+    isolate_interface: Option<bool>,
+    sequence_state: State<'_, SequenceTaskMap>,
+    interface_manager: State<'_, InterfaceManagerState>,
+) -> Result<String, String> {
+    use tokio::sync::oneshot;
+
+    let task_id = Uuid::new_v4().to_string();
+    let sequence_id = sequence.id.clone();
+    let isolate_interface = isolate_interface.unwrap_or(false);
+    
+    // 过滤出启用的数据包
+    let enabled_packets: Vec<SequencePacket> = sequence.packets.into_iter()
+        .filter(|p| p.enabled)
+        .collect();
+    
+    if enabled_packets.is_empty() {
+        return Err("没有启用的数据包".to_string());
+    }
+
+    let status = Arc::new(Mutex::new(SequenceTaskStatus {
+        task_id: task_id.clone(),
+        sequence_id: sequence_id.clone(),
+        start_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+        current_packet_index: 0,
+        current_loop: 0,
+        total_packets_sent: 0,
+        running: true,
+        completed: false,
+    }));
+
+    let (stop_tx, mut stop_rx) = oneshot::channel();
+
+    // 如果需要隔离网卡，先执行隔离操作
+    if isolate_interface {
+        if let Some(ref iface_name) = interface_name {
+            let mut manager = interface_manager.lock().map_err(|e| format!("无法获取接口管理器: {}", e))?;
+            
+            if !manager.check_admin_privileges().unwrap_or(false) {
+                return Err("网卡隔离功能需要管理员权限".to_string());
+            }
+            
+            if let Err(e) = manager.isolate_interface(iface_name) {
+                return Err(format!("隔离网卡失败: {}", e));
+            }
+        } else {
+            return Err("使用网卡隔离功能时必须指定网卡名称".to_string());
+        }
+    }
+
+    // 克隆变量以供异步任务使用
+    let status_clone = status.clone();
+    let interface_name_clone = interface_name.clone();
+    let _sequence_name = sequence.name.clone();
+    let loop_count = sequence.loop_count;
+    let loop_delay_ms = sequence.loop_delay_ms;
+    let interface_manager_clone = interface_manager.inner().clone();
+
+    // 启动序列发送任务
+    tokio::task::spawn_blocking(move || {
+        use std::time::Duration;
+        use crate::network::PacketBuilder;
+        use crate::network::interface::NetworkSender;
+
+        // 初始化网络发送器
+        let mut sender = match NetworkSender::open(interface_name_clone.as_deref().unwrap_or_default()) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("初始化网络发送器失败: {}", e);
+                let mut status = status_clone.lock().unwrap();
+                status.running = false;
+                status.completed = true;
+                return;
+            }
+        };
+
+        let mut current_loop = 0u32;
+        let max_loops = loop_count.unwrap_or(1);
+
+        // 主循环
+        'main_loop: while current_loop < max_loops {
+            // 更新当前循环数
+            {
+                let mut status = status_clone.lock().unwrap();
+                status.current_loop = current_loop;
+            }
+
+            // 发送序列中的每个数据包
+            for (packet_index, packet) in enabled_packets.iter().enumerate() {
+                // 检查是否需要停止
+                if stop_rx.try_recv().is_ok() {
+                    break 'main_loop;
+                }
+
+                // 更新当前数据包索引
+                {
+                    let mut status = status_clone.lock().unwrap();
+                    status.current_packet_index = packet_index;
+                }
+
+                // 构建数据包
+                let packet_data = PacketData {
+                    protocol: packet.protocol.clone(),
+                    fields: packet.fields.clone(),
+                    payload: packet.payload.clone(),
+                };
+
+                let packet_bytes = match PacketBuilder::new(packet_data).build() {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        eprintln!("构建数据包失败: {}", e);
+                        continue;
+                    }
+                };
+
+                // 发送数据包
+                match sender.send(&packet_bytes) {
+                    Ok(_) => {
+                        let mut status = status_clone.lock().unwrap();
+                        status.total_packets_sent += 1;
+                    }
+                    Err(e) => {
+                        eprintln!("发送数据包失败: {}", e);
+                    }
+                }
+
+                // 等待指定的延迟时间
+                if packet.delay_ms > 0 {
+                    std::thread::sleep(Duration::from_millis(packet.delay_ms));
+                }
+            }
+
+            current_loop += 1;
+
+            // 如果不是最后一轮循环，等待循环间隔
+            if current_loop < max_loops && loop_delay_ms > 0 {
+                std::thread::sleep(Duration::from_millis(loop_delay_ms));
+            }
+        }
+
+        // 任务完成，更新状态
+        {
+            let mut status = status_clone.lock().unwrap();
+            status.running = false;
+            status.completed = true;
+        }
+
+        // 如果使用了网卡隔离，恢复网卡配置
+        if isolate_interface {
+            if let Some(ref iface_name) = interface_name_clone {
+                if let Ok(mut manager) = interface_manager_clone.lock() {
+                    if let Err(e) = manager.restore_interface(iface_name) {
+                        eprintln!("恢复网卡配置失败: {}", e);
+                    }
+                }
+            }
+        }
+    });
+
+    // 将任务添加到状态管理
+    let mut map = sequence_state.lock().unwrap();
+    map.insert(task_id.clone(), SequenceTaskHandle {
+        status,
+        stop_tx: Some(stop_tx),
+        interface_name: interface_name.clone(),
+        isolate_interface,
+    });
+
+    Ok(task_id)
+}
+
+#[tauri::command]
+fn get_sequence_send_status(task_id: String, sequence_state: State<'_, SequenceTaskMap>) -> Option<SequenceTaskStatus> {
+    let map = sequence_state.lock().unwrap();
+    map.get(&task_id).map(|handle| handle.status.lock().unwrap().clone())
+}
+
+#[tauri::command]
+fn stop_sequence_send(
+    task_id: String,
+    sequence_state: State<'_, SequenceTaskMap>,
+    interface_manager: State<'_, InterfaceManagerState>
+) -> bool {
+    let mut map = sequence_state.lock().unwrap();
+    if let Some(handle) = map.get_mut(&task_id) {
+        let should_restore = handle.isolate_interface;
+        let interface_name = handle.interface_name.clone();
+        
+        if let Some(stop_tx) = handle.stop_tx.take() {
+            let _ = stop_tx.send(());
+            
+            // 如果使用了网卡隔离，恢复网卡配置
+            if should_restore {
+                if let Some(ref iface_name) = interface_name {
+                    if let Ok(mut manager) = interface_manager.lock() {
+                        if let Err(e) = manager.restore_interface(iface_name) {
+                            eprintln!("停止序列发送时恢复网卡配置失败: {}", e);
+                        }
+                    }
+                }
+            }
+            
+            return true;
+        }
+    }
+    false
+}
+
 // 数据包嗅探相关命令
 #[tauri::command]
 async fn start_packet_capture(
@@ -545,6 +757,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(network::TaskMap::default())
+        .manage(network::SequenceTaskMap::default())
         .manage(SnifferState::new(Mutex::new(SnifferManager::new())))
         .manage(MonitorState::new(Mutex::new(MonitorManager::new())))
         .manage(InterfaceManagerState::new(Mutex::new(InterfaceManager::new().expect("无法初始化接口管理器"))))
@@ -556,6 +769,9 @@ pub fn run() {
             start_batch_send,
             get_batch_send_status,
             stop_batch_send,
+            start_sequence_send,
+            get_sequence_send_status,
+            stop_sequence_send,
             start_packet_capture,
             stop_packet_capture,
             get_capture_status,
