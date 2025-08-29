@@ -39,7 +39,7 @@ const Toast = ({
   };
 
   return (
-    <div className={`fixed top-4 right-4 z-50 transition-all duration-300 ${
+    <div className={`transition-all duration-300 ${
       isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
     }`}>
       <div className={`flex items-center p-4 border rounded-lg shadow-lg max-w-sm ${colors[type]}`}>
@@ -59,7 +59,7 @@ const Toast = ({
 // Toast 管理器
 export const ToastContainer = ({ toasts, removeToast }) => {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed top-20 right-4 z-50 space-y-2">
       {toasts.map((toast) => (
         <Toast
           key={toast.id}
