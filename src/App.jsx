@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PacketEditor from "./features/packetEditor";
 import NetworkSniffer from "./features/networkSniffer/NetworkSniffer";
 // import ResponseMonitor from "./features/responseMonitor/ResponseMonitor"; // 临时隐藏
@@ -28,13 +28,33 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('packet-editor');
   const [showTabSwitchConfirm, setShowTabSwitchConfirm] = useState(false);
   const [pendingTab, setPendingTab] = useState(null);
+  const [platform, setPlatform] = useState(null);
+
+  // 检测平台
+  useEffect(() => {
+    try {
+      const userAgent = navigator.userAgent;
+      if (userAgent.includes('Mac')) {
+        setPlatform('macos');
+      } else if (userAgent.includes('Win')) {
+        setPlatform('windows');
+      } else if (userAgent.includes('Linux')) {
+        setPlatform('linux');
+      } else {
+        setPlatform('unknown');
+      }
+    } catch (error) {
+      console.warn('平台检测失败:', error);
+      setPlatform('unknown');
+    }
+  }, []);
 
   // 处理页面切换
   const handleTabSwitch = async (newTab) => {
     if (newTab === activeTab) return;
 
-    // 如果有网卡隔离任务正在运行，需要用户确认
-    if (hasIsolatedTasks()) {
+    // 如果有网卡隔离任务正在运行，需要用户确认（Windows 平台跳过）
+    if (platform !== 'windows' && hasIsolatedTasks()) {
       setPendingTab(newTab);
       setShowTabSwitchConfirm(true);
       return;
@@ -212,20 +232,32 @@ function AppContent() {
               确认页面切换
             </h3>
             <div className="mb-4 text-sm text-gray-700 dark:text-gray-300">
-              <p className="mb-2">检测到您有正在运行的网卡隔离批量发送任务：</p>
-              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded p-2">
-                {getIsolatedTasks().map(task => (
-                  <div key={task.taskId} className="text-xs text-orange-600 dark:text-orange-400">
-                    🔒 网卡 {task.interfaceName} 正在隔离模式下发送数据包
+              {platform !== 'windows' ? (
+                <>
+                  <p className="mb-2">检测到您有正在运行的网卡隔离批量发送任务：</p>
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded p-2">
+                    {getIsolatedTasks().map(task => (
+                      <div key={task.taskId} className="text-xs text-orange-600 dark:text-orange-400">
+                        🔒 网卡 {task.interfaceName} 正在隔离模式下发送数据包
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <p className="mt-2">切换页面将会：</p>
-              <ul className="list-disc list-inside ml-2 text-xs text-gray-600 dark:text-gray-400">
-                <li>停止所有正在运行的批量发送任务</li>
-                <li>自动恢复被隔离的网卡配置</li>
-                <li>确保网络连接正常</li>
-              </ul>
+                  <p className="mt-2">切换页面将会：</p>
+                  <ul className="list-disc list-inside ml-2 text-xs text-gray-600 dark:text-gray-400">
+                    <li>停止所有正在运行的批量发送任务</li>
+                    <li>自动恢复被隔离的网卡配置</li>
+                    <li>确保网络连接正常</li>
+                  </ul>
+                </>
+              ) : (
+                <>
+                  <p className="mb-2">检测到您有正在运行的批量发送任务：</p>
+                  <p className="mt-2">切换页面将会：</p>
+                  <ul className="list-disc list-inside ml-2 text-xs text-gray-600 dark:text-gray-400">
+                    <li>停止所有正在运行的批量发送任务</li>
+                  </ul>
+                </>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <button 

@@ -245,37 +245,38 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
               </div>
             )}
             
-            {/* 网卡隔离选项 */}
-            <div className="border-t pt-4 mt-4">
-              <div className="flex items-start">
-                <input 
-                  type="checkbox" 
-                  id="isolate-interface"
-                  checked={isolateInterface}
-                  onChange={e => setIsolateInterface(e.target.checked)}
-                  disabled={!hasAdminPrivileges && !checkingPrivileges}
-                  className="mt-1"
-                />
-                <div className="ml-2 flex-1">
-                  <label htmlFor="isolate-interface" className={`text-gray-700 dark:text-gray-300 ${(!hasAdminPrivileges && !checkingPrivileges) ? 'opacity-50' : ''}`}>
-                    独占网卡 (发送期间该网卡不处理其他网络流量)
-                  </label>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    启用后将暂时断开该网卡的正常网络连接，仅用于发送测试报文，发送完成后自动恢复
-                  </div>
+            {/* 网卡隔离选项 - Windows 平台隐藏 */}
+            {platform !== 'windows' && (
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-start">
+                  <input 
+                    type="checkbox" 
+                    id="isolate-interface"
+                    checked={isolateInterface}
+                    onChange={e => setIsolateInterface(e.target.checked)}
+                    disabled={!hasAdminPrivileges && !checkingPrivileges}
+                    className="mt-1"
+                  />
+                  <div className="ml-2 flex-1">
+                    <label htmlFor="isolate-interface" className={`text-gray-700 dark:text-gray-300 ${(!hasAdminPrivileges && !checkingPrivileges) ? 'opacity-50' : ''}`}>
+                      {t('batchSend.isolateInterface')}
+                    </label>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {t('batchSend.isolateDescription')}
+                    </div>
                   
                   {/* 权限状态显示 */}
                   {checkingPrivileges && (
                     <div className="text-xs text-blue-500 mt-1">
-                      ⏳ 正在检查管理员权限...
+                      ⏳ {t('batchSend.checkingPermissions')}
                     </div>
                   )}
                   {!checkingPrivileges && !hasAdminPrivileges && (
                     <div className="text-xs text-red-500 mt-1">
-                      <div>❌ 需要管理员权限才能使用此功能</div>
+                      <div>❌ {t('batchSend.adminRequired')}</div>
                       {platform === 'macos' && (
                         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
-                          <div className="font-medium mb-1">macOS 用户请使用以下命令启动：</div>
+                          <div className="font-medium mb-1">{t('batchSend.macosCommand')}</div>
                           <div className="font-mono text-xs bg-gray-800 text-green-400 p-2 rounded break-all whitespace-pre-wrap">
                             {process.env.NODE_ENV === 'development' ? (
                               'sudo pnpm tauri dev'
@@ -287,12 +288,12 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                       )}
                       {platform === 'windows' && (
                         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
-                          <div className="font-medium">Windows 用户请右键应用，选择"以管理员身份运行"</div>
+                          <div className="font-medium">{t('batchSend.windowsInstruction')}</div>
                         </div>
                       )}
                       {platform === 'linux' && (
                         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded">
-                          <div className="font-medium mb-1">Linux 用户请使用以下命令启动：</div>
+                          <div className="font-medium mb-1">{t('batchSend.linuxCommand')}</div>
                           <div className="font-mono text-xs bg-gray-800 text-green-400 p-1 rounded">
                             sudo ./BitSender
                           </div>
@@ -302,9 +303,9 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                   )}
                   {!checkingPrivileges && hasAdminPrivileges && (
                     <div className="text-xs text-green-600 dark:text-green-400 mt-1">
-                      ✅ 已检测到管理员权限
+                      ✅ {t('batchSend.adminDetected')}
                       {process.env.NODE_ENV === 'development' && (
-                        <span className="ml-2 text-blue-500">(开发模式)</span>
+                        <span className="ml-2 text-blue-500">{t('batchSend.devMode')}</span>
                       )}
                     </div>
                   )}
@@ -314,11 +315,11 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                     <div className="text-xs text-orange-600 dark:text-orange-400 mt-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-700">
                       {process.env.NODE_ENV === 'development' ? (
                         <>
-                          🧪 <strong>开发模式：</strong>网卡隔离功能将被模拟执行，不会实际影响网络连接。这只是为了测试用户界面和业务逻辑。
+                          🧪 <strong>{t('batchSend.devMode')}</strong>{t('batchSend.isolateWarningDev')}
                         </>
                       ) : (
                         <>
-                          ⚠️ <strong>警告：</strong>启用网卡隔离后，该网卡将暂时无法进行正常网络通信。如果这是您的主要网络连接，可能会影响网络访问。
+                          ⚠️ <strong>{t('common.warning')}：</strong>{t('batchSend.isolateWarning')}
                         </>
                       )}
                     </div>
@@ -326,43 +327,44 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
         
         {/* 发送中状态 */}
         {isSending && taskStatus && (
           <div className="mb-4 text-sm text-gray-700 dark:text-gray-300 space-y-2">
-            {/* 网卡隔离状态提示 */}
-            {isolateInterface && (
+            {/* 网卡隔离状态提示 - Windows 平台隐藏 */}
+            {platform !== 'windows' && isolateInterface && (
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded p-2 mb-2">
                 <div className="text-orange-600 dark:text-orange-400 text-xs">
                   {process.env.NODE_ENV === 'development' ? (
-                    <>🧪 <strong>开发模式网卡隔离：</strong>正在模拟网卡 {interfaceName} 的隔离状态</>
+                    <>🧪 <strong>{t('batchSend.devMode')}</strong>{t('batchSend.isolateStatusDev', {interface: interfaceName})}</>
                   ) : (
-                    <>🔒 <strong>网卡隔离模式：</strong>网卡 {interfaceName} 已暂时断开正常网络连接</>
+                    <>🔒 <strong>{t('batchSend.isolateStatus', {interface: interfaceName})}</strong></>
                   )}
                 </div>
               </div>
             )}
             
             <div className="flex justify-between">
-              <span>开始时间：</span>
+              <span>{t('batchSend.startTime')}：</span>
               <span>{new Date(taskStatus.start_time * 1000).toLocaleTimeString('zh-CN', { hour12: false })}</span>
             </div>
             <div className="flex justify-between">
-              <span>已发送：</span>
+              <span>{t('batchSend.sent')}：</span>
               <span className="font-mono text-blue-600 dark:text-blue-400">{taskStatus.sent_count.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>目标速度：</span>
-              <span>{taskStatus.speed.toLocaleString()} 次/秒</span>
+              <span>{t('batchSend.targetSpeed')}：</span>
+              <span>{taskStatus.speed.toLocaleString()} {t('batchSend.frequencyUnit')}</span>
             </div>
             
             {/* 进度条和剩余信息 */}
             {stopCondition !== 'manual' && (
               <>
                 <div className="flex justify-between">
-                  <span>{stopCondition === 'duration' ? '已运行：' : '进度：'}</span>
+                  <span>{stopCondition === 'duration' ? t('batchSend.running') + '：' : t('batchSend.progress') + '：'}</span>
                   <span>
                     {stopCondition === 'duration' 
                       ? `${Math.floor((Date.now() - taskStatus.start_time * 1000) / 1000)}s / ${stopValue}s`
@@ -387,8 +389,8 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                 <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                   <span>
                     {stopCondition === 'duration' 
-                      ? `剩余时间: ${Math.max(0, stopValue - Math.floor((Date.now() - taskStatus.start_time * 1000) / 1000))}秒`
-                      : `剩余: ${Math.max(0, stopValue - taskStatus.sent_count).toLocaleString()}个`
+                      ? `${t('batchSend.remainingTime')}: ${Math.max(0, stopValue - Math.floor((Date.now() - taskStatus.start_time * 1000) / 1000))}${t('batchSend.durationUnit')}`
+                      : `${t('batchSend.remaining')}: ${Math.max(0, stopValue - taskStatus.sent_count).toLocaleString()}${t('batchSend.countUnit')}`
                     }
                   </span>
                   <span>
@@ -402,7 +404,7 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
             )}
             
             <div className="mt-2 text-green-600 dark:text-green-400 text-center">
-              ⚡ 正在发送中...
+              ⚡ {t('batchSend.sending')}
             </div>
           </div>
         )}
@@ -415,21 +417,21 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                 <div className="text-2xl text-green-600 dark:text-green-400">✅</div>
                 <div className="text-green-800 dark:text-green-300 font-medium">
                   {completedStats.stoppedManually 
-                    ? '任务已手动停止' 
+                    ? t('batchSend.taskStopped')
                     : stopCondition === 'duration' 
-                      ? `已按时长完成 (${stopValue}秒)`
+                      ? t('batchSend.taskCompletedByDuration', {duration: stopValue})
                       : stopCondition === 'count'
-                        ? `已按数量完成 (${stopValue.toLocaleString()}个)`
-                        : '任务执行完成'
+                        ? t('batchSend.taskCompletedByCount', {count: stopValue.toLocaleString()})
+                        : t('batchSend.taskCompleted')
                   }
                 </div>
-                {/* 网卡恢复状态提示 */}
-                {isolateInterface && (
+                {/* 网卡恢复状态提示 - Windows 平台隐藏 */}
+                {platform !== 'windows' && isolateInterface && (
                   <div className="text-green-600 dark:text-green-400 text-xs mt-2">
                     {process.env.NODE_ENV === 'development' ? (
-                      <>🧪 开发模式：网卡 {interfaceName} 模拟恢复完成</>
+                      <>🧪 {t('batchSend.isolateRecoveredDev', {interface: interfaceName})}</>
                     ) : (
-                      <>🔓 网卡 {interfaceName} 已自动恢复正常网络连接</>
+                      <>🔓 {t('batchSend.isolateRecovered', {interface: interfaceName})}</>
                     )}
                   </div>
                 )}
@@ -437,32 +439,32 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
               
               <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
                 <div className="flex justify-between">
-                  <span>总发送数量：</span>
+                  <span>{t('batchSend.totalSent')}：</span>
                   <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
                     {completedStats.totalSent.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>目标速度：</span>
-                  <span>{completedStats.targetSpeed.toLocaleString()} 次/秒</span>
+                  <span>{t('batchSend.targetSpeed')}：</span>
+                  <span>{completedStats.targetSpeed.toLocaleString()} {t('batchSend.frequencyUnit')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>实际速度：</span>
+                  <span>{t('batchSend.actualSpeed')}：</span>
                   <span className="font-mono text-green-600 dark:text-green-400">
-                    {completedStats.actualSpeed.toLocaleString()} 次/秒
+                    {completedStats.actualSpeed.toLocaleString()} {t('batchSend.frequencyUnit')}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>执行时长：</span>
-                  <span>{completedStats.duration} 秒</span>
+                  <span>{t('batchSend.executionTime')}：</span>
+                  <span>{completedStats.duration} {t('batchSend.durationUnit')}</span>
                 </div>
                 <hr className="border-gray-300 dark:border-gray-600 my-2" />
                 <div className="flex justify-between">
-                  <span>开始时间：</span>
+                  <span>{t('batchSend.startTime')}：</span>
                   <span>{completedStats.startTime}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>结束时间：</span>
+                  <span>{t('batchSend.endTime')}：</span>
                   <span>{completedStats.endTime}</span>
                 </div>
               </div>
@@ -475,16 +477,16 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
           {!isSending && !isCompleted && (
             <>
               <button className="px-4 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-700" onClick={onCancel}>
-                取消
+{t('common.cancel')}
               </button>
               <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded" onClick={handleSend}>
-                开始发送
+{t('batchSend.startSend')}
               </button>
             </>
           )}
           {isSending && (
             <button className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded" onClick={handleStop}>
-              停止任务
+{t('batchSend.stopTask')}
             </button>
           )}
           {isCompleted && (
