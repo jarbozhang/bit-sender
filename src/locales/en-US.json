@@ -143,7 +143,21 @@
     "noEnabledPackets": "No enabled packets, please enable at least one",
     "noInterfaceSelected": "Please select a network interface first",
     "summary": "Total {total} packets, {enabled} enabled",
-    "startSequence": "Start Sequence"
+    "startSequence": "Start Sequence",
+    "export": "Export Sequence",
+    "noPacketsToExport": "Sequence is empty, nothing to export",
+    "exportSuccess": "Sequence exported to {path}",
+    "exportError": "Sequence export failed",
+    "noFileData": "No importable data found in selected files",
+    "macSummary": "MAC {src} -> {dst}",
+    "etherType": "EtherType {etherType}",
+    "noMetadata": "No header details available",
+    "editPayloadTooltip": "Click to edit payload",
+    "payloadEditorTitle": "Edit Payload",
+    "payloadEditorInstruction": "Separate hex bytes with spaces or enter plain text; leave blank to clear.",
+    "payloadEditorPlaceholder": "Enter payload data...",
+    "payloadUpdated": "Payload updated",
+    "payloadInvalidHex": "Hex payload must contain an even number of characters"
   },
   "batchSend": {
     "title": "Batch Send Settings",

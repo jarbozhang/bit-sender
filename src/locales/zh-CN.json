@@ -143,7 +143,21 @@
     "noEnabledPackets": "没有启用的数据包，请至少启用一个",
     "noInterfaceSelected": "请先选择网络接口",
     "summary": "总计 {total} 个数据包，已启用 {enabled} 个",
-    "startSequence": "开始序列发送"
+    "startSequence": "开始序列发送",
+    "export": "导出序列",
+    "noPacketsToExport": "当前序列为空，无法导出",
+    "exportSuccess": "序列已导出到 {path}",
+    "exportError": "序列导出失败",
+    "noFileData": "所选文件中没有可导入的数据",
+    "macSummary": "MAC {src} -> {dst}",
+    "etherType": "EtherType {etherType}",
+    "noMetadata": "暂无可显示的头部信息",
+    "editPayloadTooltip": "点击编辑载荷",
+    "payloadEditorTitle": "编辑载荷",
+    "payloadEditorInstruction": "十六进制字节可以用空格分隔，也可以直接输入文本，留空表示清除。",
+    "payloadEditorPlaceholder": "输入载荷数据...",
+    "payloadUpdated": "载荷已更新",
+    "payloadInvalidHex": "十六进制载荷的字符个数必须为偶数"
   },
   "batchSend": {
     "title": "批量发送设置",

@@ -6,6 +6,7 @@ import {
   ArrowDownIcon,
   PlayIcon,
   DocumentArrowUpIcon,
+  DocumentArrowDownIcon,
   ClipboardDocumentListIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
@@ -29,6 +30,9 @@ const PacketSequenceManager = ({
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [batchImportText, setBatchImportText] = useState('');
   const fileInputRef = useRef(null);
+  const [showPayloadEditor, setShowPayloadEditor] = useState(false);
+  const [payloadEditorIndex, setPayloadEditorIndex] = useState(-1);
+  const [payloadEditorValue, setPayloadEditorValue] = useState('');
 
   // 添加当前数据包到序列
   const addCurrentPacket = () => {
@@ -141,31 +145,229 @@ const PacketSequenceManager = ({
         ]
       });
 
-      if (selected && selected.length > 0) {
+      if (selected) {
         const { readTextFile } = await import('@tauri-apps/plugin-fs');
+        const filePaths = Array.isArray(selected) ? selected : [selected];
         const newPackets = [];
+        let appendIndex = sequence.length;
 
-        for (const filePath of selected) {
+        for (const filePath of filePaths) {
           const content = await readTextFile(filePath);
+          const trimmedContent = content.trim();
           const fileName = filePath.split('/').pop() || filePath.split('\\').pop();
-          
-          newPackets.push({
-            id: Date.now() + Math.random(),
-            name: fileName,
-            protocol: 'eth',
-            fields: {},
-            payload: content.trim(),
-            delayMs: 100,
-            enabled: true
-          });
+          let handled = false;
+
+          if (filePath.toLowerCase().endsWith('.json')) {
+            try {
+              const parsed = JSON.parse(trimmedContent);
+              const packetArray = Array.isArray(parsed)
+                ? parsed
+                : Array.isArray(parsed.packets)
+                  ? parsed.packets
+                  : null;
+
+              if (packetArray && packetArray.length > 0) {
+                packetArray.forEach((packet, idx) => {
+                  newPackets.push({
+                    id: Date.now() + Math.random(),
+                    name: packet.name || `${t('sequence.importedPacket')} ${appendIndex + idx + 1}`,
+                    protocol: packet.protocol || 'eth',
+                    fields: { ...(packet.fields || {}) },
+                    payload: packet.payload || '',
+                    delayMs: typeof packet.delayMs === 'number'
+                      ? packet.delayMs
+                      : typeof packet.delay_ms === 'number'
+                        ? packet.delay_ms
+                        : 100,
+                    enabled: packet.enabled === false ? false : true
+                  });
+                });
+                appendIndex += packetArray.length;
+                handled = true;
+              }
+            } catch (jsonError) {
+              console.warn('Failed to parse JSON sequence file:', jsonError);
+            }
+          }
+
+          if (!handled && trimmedContent) {
+            newPackets.push({
+              id: Date.now() + Math.random(),
+              name: fileName || `${t('sequence.importedPacket')} ${appendIndex + 1}`,
+              protocol: 'eth',
+              fields: {},
+              payload: trimmedContent,
+              delayMs: 100,
+              enabled: true
+            });
+            appendIndex += 1;
+          }
         }
 
-        setSequence([...sequence, ...newPackets]);
-        showSuccess(t('sequence.fileImportSuccess', {}, { count: newPackets.length }));
+        if (newPackets.length > 0) {
+          setSequence(prev => [...prev, ...newPackets]);
+          showSuccess(t('sequence.fileImportSuccess', {}, { count: newPackets.length }));
+        } else {
+          showInfo(t('sequence.noFileData'));
+        }
       }
     } catch (error) {
       showError(t('sequence.fileImportError') + ': ' + error.message);
     }
+  };
+
+  // 导出当前序列为 JSON 文件
+  const handleExportSequence = async () => {
+    if (sequence.length === 0) {
+      showError(t('sequence.noPacketsToExport'));
+      return;
+    }
+
+    try {
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        count: sequence.length,
+        packets: sequence.map(packet => ({
+          name: packet.name,
+          protocol: packet.protocol,
+          fields: { ...(packet.fields || {}) },
+          payload: packet.payload || '',
+          delayMs: typeof packet.delayMs === 'number' ? packet.delayMs : 100,
+          enabled: packet.enabled === false ? false : true
+        }))
+      };
+
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const defaultFileName = `packet_sequence_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+      const filePath = await save({
+        defaultPath: defaultFileName,
+        filters: [
+          { name: 'JSON Files', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (filePath) {
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        await writeTextFile(filePath, JSON.stringify(exportData, null, 2));
+        showSuccess(t('sequence.exportSuccess', {}, { path: filePath }));
+      }
+    } catch (error) {
+      showError(t('sequence.exportError') + ': ' + error.message);
+    }
+  };
+
+  const formatPayloadPreview = (payload) => {
+    if (!payload) return '';
+
+    const clean = typeof payload === 'string' ? payload.replace(/\s+/g, '') : '';
+    if (clean && /^[0-9a-fA-F]+$/.test(clean)) {
+      const bytes = clean.match(/.{1,2}/g) || [];
+      if (bytes.length === 0) return '';
+      const previewBytes = bytes.slice(0, 16).map((byte) => byte.toUpperCase());
+      const formatted = previewBytes.join(' ');
+      return bytes.length > 16 ? `${formatted} ...` : formatted;
+    }
+
+    const normalized = String(payload);
+    return normalized.length > 30 ? `${normalized.slice(0, 30)}...` : normalized;
+  };
+
+  const formatPayloadForEditor = (payload) => {
+    if (!payload) return '';
+    const clean = typeof payload === 'string' ? payload.replace(/\s+/g, '') : '';
+    if (clean && /^[0-9a-fA-F]+$/.test(clean) && clean.length % 2 === 0) {
+      return (clean.match(/.{1,2}/g) || []).map((byte) => byte.toUpperCase()).join(' ');
+    }
+    return typeof payload === 'string' ? payload : String(payload);
+  };
+
+  // 提取关键字段用于展示
+  const getPacketMetadata = (packet) => {
+    const fields = packet?.fields || {};
+    const entries = Object.entries(fields);
+    const normalizeValue = (value) => {
+      if (value === undefined || value === null) return '';
+      if (typeof value === 'string') return value.trim();
+      return String(value);
+    };
+    const findValue = (predicate) => {
+      const match = entries.find(([key]) => predicate(key.toLowerCase()));
+      return match ? normalizeValue(match[1]) : '';
+    };
+
+    const srcMac = findValue((key) => key.includes('src') && key.includes('mac'));
+    const dstMac = findValue((key) => (key.includes('dst') || key.includes('dest')) && key.includes('mac'));
+    const etherType =
+      findValue((key) => key.includes('ether') && key.includes('type')) ||
+      findValue((key) => key === 'type');
+
+    const parts = [];
+    if (srcMac || dstMac) {
+      parts.push(
+        t('sequence.macSummary', {}, { src: srcMac || '--', dst: dstMac || '--' })
+      );
+    }
+    if (etherType) {
+      parts.push(t('sequence.etherType', {}, { etherType }));
+    }
+
+    if (parts.length === 0 && entries.length > 0) {
+      const sample = entries
+        .slice(0, 3)
+        .map(([key, value]) => `${key}: ${normalizeValue(value)}`)
+        .join(' · ');
+      return sample;
+    }
+
+    return parts.length > 0 ? parts.join(' | ') : t('sequence.noMetadata');
+  };
+
+  const handleOpenPayloadEditor = (index) => {
+    const packet = sequence[index];
+    if (!packet) return;
+    setPayloadEditorIndex(index);
+    setPayloadEditorValue(formatPayloadForEditor(packet.payload || ''));
+    setShowPayloadEditor(true);
+  };
+
+  const resetPayloadEditor = () => {
+    setShowPayloadEditor(false);
+    setPayloadEditorIndex(-1);
+    setPayloadEditorValue('');
+  };
+
+  const handleSavePayload = () => {
+    if (payloadEditorIndex < 0) {
+      resetPayloadEditor();
+      return;
+    }
+
+    const rawValue = payloadEditorValue.trim();
+    if (!rawValue) {
+      updatePacket(payloadEditorIndex, { payload: '' });
+      showSuccess(t('sequence.payloadUpdated'));
+      resetPayloadEditor();
+      return;
+    }
+
+    const hexCandidate = rawValue.replace(/\s+/g, '');
+    const isHexLike = /^[0-9a-fA-F]+$/.test(hexCandidate);
+
+    if (isHexLike) {
+      if (hexCandidate.length % 2 !== 0) {
+        showError(t('sequence.payloadInvalidHex'));
+        return;
+      }
+      updatePacket(payloadEditorIndex, { payload: hexCandidate.toUpperCase() });
+      showSuccess(t('sequence.payloadUpdated'));
+      resetPayloadEditor();
+      return;
+    }
+
+    updatePacket(payloadEditorIndex, { payload: rawValue });
+    showSuccess(t('sequence.payloadUpdated'));
+    resetPayloadEditor();
   };
 
   // 开始序列发送
@@ -183,7 +385,7 @@ const PacketSequenceManager = ({
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* 标题栏 */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
@@ -241,11 +443,21 @@ const PacketSequenceManager = ({
               <DocumentArrowUpIcon className="w-4 h-4" />
               {t('sequence.fileImport')}
             </Button>
+            
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportSequence}
+              className="flex items-center gap-1"
+            >
+              <DocumentArrowDownIcon className="w-4 h-4" />
+              {t('sequence.export')}
+            </Button>
           </div>
         </div>
 
         {/* 数据包列表 */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {sequence.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <ClipboardDocumentListIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -289,7 +501,22 @@ const PacketSequenceManager = ({
                         />
                         <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           {t('sequence.protocol')}: {packet.protocol.toUpperCase()} 
-                          {packet.payload && ` | ${t('sequence.payload')}: ${packet.payload.substring(0, 30)}${packet.payload.length > 30 ? '...' : ''}`}
+                          {packet.payload && (
+                            <>
+                              {' | '}{t('sequence.payload')}:{' '}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPayloadEditor(index)}
+                                className="text-blue-600 hover:text-blue-500 dark:text-blue-400 underline underline-offset-2 decoration-dotted"
+                                title={t('sequence.editPayloadTooltip')}
+                              >
+                                {formatPayloadPreview(packet.payload)}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 font-mono">
+                          {getPacketMetadata(packet)}
                         </div>
                       </div>
                       
@@ -381,6 +608,34 @@ const PacketSequenceManager = ({
                 </Button>
                 <Button variant="primary" onClick={handleBatchImport}>
                   {t('sequence.import')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* 载荷编辑对话框 */}
+        {showPayloadEditor && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-3xl w-full mx-4">
+              <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-100">
+                {t('sequence.payloadEditorTitle')}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {t('sequence.payloadEditorInstruction')}
+              </p>
+              <textarea
+                value={payloadEditorValue}
+                onChange={(e) => setPayloadEditorValue(e.target.value)}
+                placeholder={t('sequence.payloadEditorPlaceholder')}
+                className="w-full h-48 p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm font-mono"
+              />
+              <div className="flex justify-end gap-3 mt-4">
+                <Button variant="secondary" onClick={resetPayloadEditor}>
+                  {t('common.cancel')}
+                </Button>
+                <Button variant="primary" onClick={handleSavePayload}>
+                  {t('common.save')}
                 </Button>
               </div>
             </div>
