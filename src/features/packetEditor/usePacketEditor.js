@@ -7,7 +7,8 @@ export const usePacketEditor = () => {
 
   const handleProtoChange = (e) => {
     const p = PROTOCOLS.find((x) => x.key === e.target.value);
-    setProto(p);
+    // 防御：若未找到协议（例如模板引用了被隐藏/未定义的协议），回落到第一个协议
+    setProto(p || PROTOCOLS[0]);
     setFields({});
   };
 

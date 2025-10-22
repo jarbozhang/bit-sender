@@ -27,28 +27,6 @@ export const PROTOCOLS = [
     ],
   },
   {
-    nameKey: "protocols.ipv4",
-    key: "ipv4",
-    fields: [
-      { labelKey: "labels.dst_mac", key: "dst_mac", type: "text", placeholder: "AA:BB:CC:DD:EE:FF", maxLength: 17 },
-      { labelKey: "labels.src_mac", key: "src_mac", type: "text", placeholder: "__LOCAL_MAC__", maxLength: 17 },
-      { labelKey: "labels.ether_type", key: "ether_type", type: "text", placeholder: "0800", maxLength: 4 },
-      { labelKey: "labels.version", key: "version", type: "number", placeholder: "4", maxLength: 1 },
-      { labelKey: "labels.ihl", key: "ihl", type: "number", placeholder: "5", maxLength: 1 },
-      { labelKey: "labels.tos", key: "tos", type: "number", placeholder: "0", maxLength: 3 },
-      { labelKey: "labels.total_length", key: "total_length", type: "number", placeholder: "0", maxLength: 5 },
-      { labelKey: "labels.identification", key: "identification", type: "number", placeholder: "0", maxLength: 5 },
-      { labelKey: "labels.flags", key: "flags", type: "number", placeholder: "2", maxLength: 1 },
-      { labelKey: "labels.fragment_offset", key: "fragment_offset", type: "number", placeholder: "0", maxLength: 4 },
-      { labelKey: "labels.ttl", key: "ttl", type: "number", placeholder: "64", maxLength: 3 },
-      { labelKey: "labels.protocol", key: "protocol", type: "number", placeholder: "6", maxLength: 3 },
-      { labelKey: "labels.header_checksum", key: "header_checksum", type: "number", placeholder: "0", maxLength: 5 },
-      { labelKey: "labels.srcIp", key: "srcIp", type: "text", placeholder: "__LOCAL_IP__", maxLength: 15 },
-      { labelKey: "labels.dstIp", key: "dstIp", type: "text", placeholder: "192.168.1.2", maxLength: 15 },
-      { labelKey: "labels.data", key: "data", type: "text", placeholder: "00", maxLength: 1460 },
-    ],
-  },
-  {
     nameKey: "protocols.udp",
     key: "udp",
     fields: [

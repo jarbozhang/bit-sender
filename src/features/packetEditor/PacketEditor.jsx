@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PROTOCOLS } from './config';
-import { hexPreview } from './utils';
+// hex preview now built by backend, do not import local preview
 import { usePacketEditor } from './usePacketEditor';
 import Button from '../../components/Button';
 import CustomSelect from '../../components/CustomSelect';
@@ -60,6 +60,9 @@ const PacketEditor = () => {
   const [importText, setImportText] = useState('');
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showSequenceManager, setShowSequenceManager] = useState(false);
+  // 预览由后端构建，保证与发送一致
+  const [previewHex, setPreviewHex] = useState("");
+  const [previewError, setPreviewError] = useState(null);
   
   // 模板管理状态 (从TemplateManager移过来)
   const [templates, setTemplates] = useState([]);
@@ -83,6 +86,24 @@ const PacketEditor = () => {
       setLocalIp(ipv4 || "");
     }
   }, [selectedInterface]);
+
+  // 调用后端构建报文预览
+  useEffect(() => {
+    let cancelled = false;
+    const build = async () => {
+      try {
+        setPreviewError(null);
+        const current = getCurrentPacketData();
+        const { invoke } = await import('@tauri-apps/api/core');
+        const hex = await invoke('build_packet_preview', { packetData: current });
+        if (!cancelled) setPreviewHex(typeof hex === 'string' ? hex : '');
+      } catch (e) {
+        if (!cancelled) setPreviewError(e?.message || String(e));
+      }
+    };
+    const timer = setTimeout(build, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [proto, fields, localMac, localIp]);
 
   const handleTestSend = async () => {
     doTestSend();
@@ -287,47 +308,30 @@ const PacketEditor = () => {
     handleRuleChange(key, value);
   };
 
-  // 导出为 Hex Dump 格式
+  // 导出为 Hex Dump 格式（使用后端构建的报文）
   const handleExportHexDump = async () => {
-    const previewHex = hexPreview(fields, proto, localMac, localIp);
-    if (!previewHex) {
-      showError(t('export.noData'));
-      return;
-    }
-    
     try {
-      // 将预览的十六进制转换为连续字符串
-      const hexString = previewHex.replace(/\s+/g, '');
-      const hexDump = generateHexDump(hexString);
-      
-      // 生成默认文件名
+      const { invoke } = await import('@tauri-apps/api/core');
+      const hexString = await invoke('build_packet_preview', { packetData: getCurrentPacketData() });
+      if (!hexString) {
+        showError(t('export.noData'));
+        return;
+      }
+      const hexDump = generateHexDump(String(hexString));
       const defaultFileName = `packet_${proto.key}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
-      
-      // 使用 Tauri 的文件保存对话框
       const { save } = await import('@tauri-apps/plugin-dialog');
-      
       const filePath = await save({
         defaultPath: defaultFileName,
         filters: [
-          {
-            name: 'Text Files',
-            extensions: ['txt']
-          },
-          {
-            name: 'All Files',
-            extensions: ['*']
-          }
+          { name: 'Text Files', extensions: ['txt'] },
+          { name: 'All Files', extensions: ['*'] }
         ]
       });
-      
       if (filePath) {
-        // 使用 Tauri 的文件系统 API 写入文件
         const { writeTextFile } = await import('@tauri-apps/plugin-fs');
         await writeTextFile(filePath, hexDump);
-        
         showSuccess(t('export.success', {}, { path: filePath }));
       }
-      
     } catch (error) {
       console.error('导出失败:', error);
       const errorMessage = error?.message || error?.toString() || '未知错误';
@@ -870,8 +874,11 @@ const PacketEditor = () => {
       <div className="mt-6">
         <label className="font-medium text-gray-700 dark:text-gray-300">{t('packet.preview')}</label>
         <pre className="bg-gray-100 dark:bg-gray-900 rounded p-3 font-mono text-sm mt-2 whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
-          {hexPreview(fields, proto, localMac, localIp) || <span className="text-gray-500">{t('packet.previewPlaceholder')}</span>}
+          {previewHex ? generateHexDump(previewHex) : <span className="text-gray-500">{t('packet.previewPlaceholder')}</span>}
         </pre>
+        {previewError && (
+          <div className="text-xs text-red-500 mt-1">{previewError}</div>
+        )}
       </div>
 
       {/* 操作按钮区域 */}

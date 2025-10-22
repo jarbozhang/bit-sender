@@ -22,6 +22,46 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+// Build packet bytes using the same builder as send; return uppercase hex string
+#[tauri::command]
+async fn build_packet_preview(packet_data: serde_json::Value) -> Result<String, String> {
+    let protocol = packet_data
+        .get("protocol")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "缺少协议类型".to_string())?
+        .to_string();
+
+    let fields_obj = packet_data
+        .get("fields")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| "缺少字段数据".to_string())?;
+
+    let mut fields = HashMap::new();
+    for (k, v) in fields_obj.iter() {
+        match v {
+            Value::String(s) => { fields.insert(k.clone(), s.clone()); }
+            Value::Number(n) => { fields.insert(k.clone(), n.to_string()); }
+            Value::Bool(b) => { fields.insert(k.clone(), b.to_string()); }
+            _ => {}
+        }
+    }
+
+    let payload = packet_data
+        .get("payload")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let data = PacketData { protocol, fields, payload };
+    match network::PacketBuilder::new(data).build() {
+        Ok(bytes) => {
+            let mut hex = String::with_capacity(bytes.len() * 2);
+            for b in bytes { hex.push_str(&format!("{:02X}", b)); }
+            Ok(hex)
+        }
+        Err(e) => Err(format!("构建预览失败: {}", e)),
+    }
+}
+
 #[tauri::command]
 async fn send_packet(packet_data: Value, interface_name: Option<String>) -> Result<SendResult, String> {
     // 将 JSON 数据转换为 PacketData
@@ -36,8 +76,11 @@ async fn send_packet(packet_data: Value, interface_name: Option<String>) -> Resu
     
     let mut fields = HashMap::new();
     for (key, value) in fields_value {
-        if let Some(str_value) = value.as_str() {
-            fields.insert(key.clone(), str_value.to_string());
+        match value {
+            Value::String(s) => { fields.insert(key.clone(), s.clone()); }
+            Value::Number(n) => { fields.insert(key.clone(), n.to_string()); }
+            Value::Bool(b) => { fields.insert(key.clone(), b.to_string()); }
+            _ => {}
         }
     }
     
@@ -187,9 +230,22 @@ async fn start_batch_send(
                 };
 
                 // 构建数据包
+                let fields_map = packet_for_thread["fields"].as_object().map(|o| {
+                    let mut m = HashMap::new();
+                    for (k, v) in o.iter() {
+                        match v {
+                            Value::String(s) => { m.insert(k.clone(), s.clone()); }
+                            Value::Number(n) => { m.insert(k.clone(), n.to_string()); }
+                            Value::Bool(b) => { m.insert(k.clone(), b.to_string()); }
+                            _ => {}
+                        }
+                    }
+                    m
+                }).unwrap_or_default();
+
                 let packet_bytes = match network::PacketBuilder::new(PacketData {
                     protocol: packet_for_thread["protocol"].as_str().unwrap_or_default().to_string(),
-                    fields: packet_for_thread["fields"].as_object().unwrap().iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string())).collect(),
+                    fields: fields_map,
                     payload: packet_for_thread["payload"].as_str().map(String::from),
                 }).build() {
                     Ok(bytes) => bytes,
@@ -763,6 +819,7 @@ pub fn run() {
         .manage(InterfaceManagerState::new(Mutex::new(InterfaceManager::new().expect("无法初始化接口管理器"))))
         .invoke_handler(tauri::generate_handler![
             greet,
+            build_packet_preview,
             send_packet,
             get_network_interfaces,
             check_admin_privileges,

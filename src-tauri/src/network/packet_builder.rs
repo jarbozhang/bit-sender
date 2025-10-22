@@ -227,15 +227,66 @@ impl PacketBuilder {
         let ack = ack.parse::<u32>().unwrap_or(0);
         packet.extend_from_slice(&ack.to_be_bytes());
         
-        // 数据偏移和标志 (2 bytes)
-        packet.extend_from_slice(&[0x50, 0x00]); // 数据偏移 5*4=20, 无标志
+        // 数据偏移与标志 (2 bytes)
+        let data_offset = self
+            .get_field("data_offset", "5")?
+            .parse::<u8>()
+            .unwrap_or(5)
+            .clamp(5, 15);
+        let reserved = self
+            .get_field("reserved", "0")?
+            .parse::<u8>()
+            .unwrap_or(0)
+            & 0x07;
+        let flag_urg = self
+            .get_field("flag_urg", "0")?
+            .parse::<u8>()
+            .unwrap_or(0)
+            & 0x01;
+        let flag_ack = self
+            .get_field("flag_ack", "0")?
+            .parse::<u8>()
+            .unwrap_or(0)
+            & 0x01;
+        let flag_psh = self
+            .get_field("flag_psh", "0")?
+            .parse::<u8>()
+            .unwrap_or(0)
+            & 0x01;
+        let flag_rst = self
+            .get_field("flag_rst", "0")?
+            .parse::<u8>()
+            .unwrap_or(0)
+            & 0x01;
+        let flag_syn = self
+            .get_field("flag_syn", "1")?
+            .parse::<u8>()
+            .unwrap_or(1)
+            & 0x01;
+        let flag_fin = self
+            .get_field("flag_fin", "0")?
+            .parse::<u8>()
+            .unwrap_or(0)
+            & 0x01;
+
+        // 第一个字节: data_offset(4) | reserved(3) | ns(1=0)
+        let offset_reserved_ns = ((data_offset & 0x0F) << 4) | ((reserved & 0x07) << 1);
+        // 第二个字节: URG ACK PSH RST SYN FIN
+        let flags_byte = (flag_urg << 5)
+            | (flag_ack << 4)
+            | (flag_psh << 3)
+            | (flag_rst << 2)
+            | (flag_syn << 1)
+            | flag_fin;
+        packet.extend_from_slice(&[offset_reserved_ns, flags_byte]);
         
         // 窗口大小 (2 bytes)
         let window_size = self.get_field("window_size", "8192")?;
         let window_size = window_size.parse::<u16>().unwrap_or(8192);
         packet.extend_from_slice(&window_size.to_be_bytes());
         
-        // 校验和 (2 bytes) - 稍后计算
+        // 校验和 (2 bytes) - 默认0；若用户提供则填入
+        let tcp_checksum_pos = packet.len();
         packet.extend_from_slice(&[0x00, 0x00]);
         
         // 紧急指针 (2 bytes)
@@ -257,6 +308,25 @@ impl PacketBuilder {
         let checksum = self.calculate_ip_checksum(&packet[14..14 + 20]);
         packet[ip_checksum_pos] = (checksum >> 8) as u8;
         packet[ip_checksum_pos + 1] = checksum as u8;
+
+        // 如果用户提供了 TCP 校验和，使用用户值覆盖（十六进制或十进制）
+        if let Ok(cs_str) = self.get_field("checksum", "0") {
+            let cs_trim = cs_str.trim();
+            if !cs_trim.is_empty() {
+                let cs_val = if cs_trim.starts_with("0x") || cs_trim.starts_with("0X") {
+                    u16::from_str_radix(&cs_trim[2..], 16).unwrap_or(0)
+                } else if let Ok(dec) = cs_trim.parse::<u16>() {
+                    dec
+                } else {
+                    u16::from_str_radix(cs_trim, 16).unwrap_or(0)
+                };
+                if cs_val != 0 {
+                    let bytes = cs_val.to_be_bytes();
+                    packet[tcp_checksum_pos] = bytes[0];
+                    packet[tcp_checksum_pos + 1] = bytes[1];
+                }
+            }
+        }
         
         Ok(packet)
     }
@@ -310,7 +380,8 @@ impl PacketBuilder {
         let udp_length_pos = packet.len();
         packet.extend_from_slice(&[0x00, 0x00]);
         
-        // 校验和 (2 bytes)
+        // 校验和 (2 bytes) - 默认0，支持前端覆盖
+        let udp_checksum_pos = packet.len();
         packet.extend_from_slice(&[0x00, 0x00]);
         
         // Payload
@@ -323,8 +394,11 @@ impl PacketBuilder {
         packet[total_length_pos] = (ip_length >> 8) as u8;
         packet[total_length_pos + 1] = ip_length as u8;
         
-        // 计算并填充UDP长度 (UDP头部 + payload)
-        let udp_length = (packet.len() - 14 - 20) as u16; // 减去以太网头部和IP头部
+        // 计算并填充UDP长度 (UDP头部 + payload)，允许前端覆盖
+        let computed_udp_length = (packet.len() - 14 - 20) as u16; // 减去以太网头部和IP头部
+        let udp_len_field = self.get_field("length", "0")?;
+        let udp_len_override = udp_len_field.parse::<u16>().unwrap_or(0);
+        let udp_length = if udp_len_override > 0 { udp_len_override } else { computed_udp_length };
         packet[udp_length_pos] = (udp_length >> 8) as u8;
         packet[udp_length_pos + 1] = udp_length as u8;
         
@@ -332,45 +406,81 @@ impl PacketBuilder {
         let checksum = self.calculate_ip_checksum(&packet[14..14 + 20]);
         packet[ip_checksum_pos] = (checksum >> 8) as u8;
         packet[ip_checksum_pos + 1] = checksum as u8;
+
+        // 覆盖UDP校验和（如果前端提供了非0值；未计算伪首部校验和）
+        if let Ok(cs_str) = self.get_field("checksum", "0") {
+            let cs_trim = cs_str.trim();
+            if !cs_trim.is_empty() {
+                let cs_val = if cs_trim.starts_with("0x") || cs_trim.starts_with("0X") {
+                    u16::from_str_radix(&cs_trim[2..], 16).unwrap_or(0)
+                } else if let Ok(dec) = cs_trim.parse::<u16>() {
+                    dec
+                } else {
+                    u16::from_str_radix(cs_trim, 16).unwrap_or(0)
+                };
+                if cs_val != 0 {
+                    let bytes = cs_val.to_be_bytes();
+                    packet[udp_checksum_pos] = bytes[0];
+                    packet[udp_checksum_pos + 1] = bytes[1];
+                }
+            }
+        }
         
         Ok(packet)
     }
 
     fn build_arp_packet(&self) -> Result<Vec<u8>> {
         let mut packet = Vec::new();
-        
-        // 硬件类型 (2 bytes) - 以太网
-        packet.extend_from_slice(&[0x00, 0x01]);
-        
-        // 协议类型 (2 bytes) - IPv4
-        packet.extend_from_slice(&[0x08, 0x00]);
-        
-        // 硬件地址长度 (1 byte)
-        packet.push(6);
-        
-        // 协议地址长度 (1 byte)
-        packet.push(4);
-        
-        // 操作码 (2 bytes) - 请求
-        let op = self.get_field("op", "0001")?;
-        packet.extend_from_slice(&self.parse_hex(&op)?);
-        
-        // 发送方硬件地址 (6 bytes)
-        let sender_mac = self.get_field("sender_mac", "00:00:00:00:00:00")?;
+
+        // Ethernet header
+        let dst_mac = self.get_field_multi(&["dst_mac", "dstMac", "target_mac", "targetMac"], "ff:ff:ff:ff:ff:ff")?;
+        packet.extend_from_slice(&self.parse_mac(&dst_mac)?);
+
+        let src_mac = self.get_field_multi(&["src_mac", "srcMac", "sender_mac", "senderMac"], "00:00:00:00:00:00")?;
+        packet.extend_from_slice(&self.parse_mac(&src_mac)?);
+
+        let ether_type = self.get_field_multi(&["ether_type", "etherType"], "0806")?;
+        packet.extend_from_slice(&self.parse_hex(&ether_type)?);
+
+        // ARP header
+        let hw_type = self.get_field_multi(&["hwType", "hardware_type"], "1")?;
+        packet.extend_from_slice(&self.parse_u16_value(&hw_type, 1)?);
+
+        let proto_type = self.get_field_multi(&["protoType", "protocol_type"], "0x0800")?;
+        packet.extend_from_slice(&self.parse_u16_value(&proto_type, 0x0800)?);
+
+        let hw_size = self.get_field_multi(&["hwSize", "hw_len", "hardware_size"], "6")?;
+        packet.push(self.parse_u8_value(&hw_size, 6)?);
+
+        let proto_size = self.get_field_multi(&["protoSize", "proto_len", "protocol_size"], "4")?;
+        packet.push(self.parse_u8_value(&proto_size, 4)?);
+
+        let opcode = self.get_field_multi(&["opcode", "op", "operation"], "1")?;
+        packet.extend_from_slice(&self.parse_u16_value(&opcode, 1)?);
+
+        let sender_mac = self.get_field_multi(&["srcMac", "sender_mac", "senderMac"], &src_mac)?;
         packet.extend_from_slice(&self.parse_mac(&sender_mac)?);
-        
-        // 发送方协议地址 (4 bytes)
-        let sender_ip = self.get_field("sender_ip", "192.168.1.1")?;
+
+        let sender_ip = self.get_field_multi(&["srcIp", "sender_ip", "senderIp"], "0.0.0.0")?;
         packet.extend_from_slice(&self.parse_ip(&sender_ip)?);
-        
-        // 目标硬件地址 (6 bytes)
-        let target_mac = self.get_field("target_mac", "00:00:00:00:00:00")?;
+
+        let target_mac = self.get_field_multi(&["dstMac", "target_mac", "targetMac"], &dst_mac)?;
         packet.extend_from_slice(&self.parse_mac(&target_mac)?);
-        
-        // 目标协议地址 (4 bytes)
-        let target_ip = self.get_field("target_ip", "192.168.1.2")?;
+
+        let target_ip = self.get_field_multi(&["dstIp", "target_ip", "targetIp"], "0.0.0.0")?;
         packet.extend_from_slice(&self.parse_ip(&target_ip)?);
-        
+
+        // Optional ARP payload
+        if let Some(payload) = &self.data.payload {
+            // 支持空格/冒号分隔的十六进制
+            packet.extend_from_slice(&self.parse_hex(payload)?);
+        }
+
+        // Minimum Ethernet frame size without FCS is 60 bytes
+        while packet.len() < 60 {
+            packet.push(0);
+        }
+
         Ok(packet)
     }
 
@@ -416,6 +526,53 @@ impl PacketBuilder {
             .unwrap_or_else(|| default.to_string()))
     }
 
+    fn get_field_multi(&self, keys: &[&str], default: &str) -> Result<String> {
+        for key in keys {
+            if let Some(v) = self.data.fields.get(*key) {
+                return Ok(v.clone());
+            }
+        }
+        Ok(default.to_string())
+    }
+
+    fn parse_u16_value(&self, value: &str, default: u16) -> Result<[u8; 2]> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Ok(default.to_be_bytes());
+        }
+        let hex_part = if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+            &trimmed[2..]
+        } else {
+            trimmed
+        };
+        if let Ok(n) = u16::from_str_radix(hex_part, 16) {
+            return Ok(n.to_be_bytes());
+        }
+        if let Ok(n) = trimmed.parse::<u16>() {
+            return Ok(n.to_be_bytes());
+        }
+        Err(anyhow!("无法解析为16位数值: {}", value))
+    }
+
+    fn parse_u8_value(&self, value: &str, default: u8) -> Result<u8> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Ok(default);
+        }
+        let hex_part = if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+            &trimmed[2..]
+        } else {
+            trimmed
+        };
+        if let Ok(n) = u8::from_str_radix(hex_part, 16) {
+            return Ok(n);
+        }
+        if let Ok(n) = trimmed.parse::<u8>() {
+            return Ok(n);
+        }
+        Err(anyhow!("无法解析为8位数值: {}", value))
+    }
+
     fn parse_mac(&self, mac: &str) -> Result<Vec<u8>> {
         let parts: Vec<&str> = mac.split(':').collect();
         if parts.len() != 6 {
@@ -430,14 +587,18 @@ impl PacketBuilder {
     }
 
     fn parse_ip(&self, ip: &str) -> Result<Vec<u8>> {
-        let parts: Vec<&str> = ip.split('.').collect();
-        if parts.len() != 4 {
-            return Err(anyhow!("无效的 IP 地址格式: {}", ip));
+        let trimmed = ip.trim();
+        if trimmed.is_empty() {
+            return Ok(vec![0, 0, 0, 0]);
         }
-        
+        let parts: Vec<&str> = trimmed.split('.').collect();
+        if parts.len() != 4 {
+            return Err(anyhow!("无效的 IP 地址格式: {}", trimmed));
+        }
         let mut result = Vec::new();
         for part in parts {
-            result.push(part.parse::<u8>()?);
+            let v = part.parse::<u8>().map_err(|_| anyhow!("无效的 IP 地址段: {}", trimmed))?;
+            result.push(v);
         }
         Ok(result)
     }
