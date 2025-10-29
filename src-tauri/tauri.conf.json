@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BitSender",
-  "version": "1.2.0",
   "identifier": "com.BitSender.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -19,7 +18,9 @@
     ],
     "security": {
       "csp": null,
-      "capabilities": ["default"]
+      "capabilities": [
+        "default"
+      ]
     }
   },
   "plugins": {},
