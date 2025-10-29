@@ -147,11 +147,9 @@ if [ -f "src-tauri/Cargo.toml" ]; then
     sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" src-tauri/Cargo.toml
     rm -f src-tauri/Cargo.toml.bak
     
-    # 确保Cargo.lock也更新到正确的版本
+    # 刷新Cargo.lock而不触发构建产物
     log_info "更新Cargo.lock版本号..."
-    cd src-tauri
-    cargo check --quiet || true  # 触发Cargo.lock更新，忽略潜在错误
-    cd ..
+    (cd src-tauri && cargo generate-lockfile --quiet || true)
 fi
 
 # 同步更新 Tauri 配置版本号（用于打包产物文件名）
