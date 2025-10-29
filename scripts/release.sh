@@ -157,13 +157,13 @@ fi
 # 同步更新 Tauri 配置版本号（用于打包产物文件名）
 if [ -f "src-tauri/tauri.conf.json" ]; then
     log_info "更新tauri.conf.json版本号..."
-    node -e '
+    NEW_VER="$new_version" node -e '
         const fs = require("fs");
         const p = "src-tauri/tauri.conf.json";
         const j = JSON.parse(fs.readFileSync(p, "utf8"));
         j.version = process.env.NEW_VER;
         fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
-    ' NEW_VER="$new_version"
+    '
 fi
 
 # 提交版本更新
@@ -179,16 +179,15 @@ if [ -f "src-tauri/tauri.conf.json" ]; then
     git add src-tauri/tauri.conf.json
 fi
 
-git commit -m "chore: bump version to $new_version
+git commit -m "chore: bump version to $new_version"
 
 # 创建标签
 log_info "创建版本标签 v$new_version..."
-git tag -a "v$new_version" -m "Release v$new_version
-
-🚀 自动发布版本 v$new_version
-
-主要改进:
-- 查看 GitHub Releases 页面获取详细更新说明
+git tag -a "v$new_version" \
+  -m "Release v$new_version" \
+  -m "🚀 自动发布版本 v$new_version" \
+  -m "主要改进:" \
+  -m "- 查看 GitHub Releases 页面获取详细更新说明"
 
 # 推送到远程
 log_info "推送代码和标签到远程仓库..."
