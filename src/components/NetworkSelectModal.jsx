@@ -18,7 +18,22 @@ const NetworkSelectModal = ({ visible, onClose, onSelect }) => {
       setError(null);
       getNetworkInterfaces()
         .then((list) => {
-          setInterfaces(list);
+          const hasValidMac = (mac) => mac && mac !== "00:00:00:00:00:00";
+          const isIPv4 = (addr) => /^\d+\.\d+\.\d+\.\d+$/.test(addr);
+          const hasIPv4 = (iface) => (iface.addresses || []).some(isIPv4);
+
+          // 1) 过滤掉没有有效 MAC 的网卡
+          const filtered = (Array.isArray(list) ? list : []).filter(i => hasValidMac(i.mac));
+          // 2) 将有 IPv4 的网卡置前
+          const withIp = filtered.filter(hasIPv4);
+          const withoutIp = filtered.filter(i => !hasIPv4(i));
+          const sorted = [...withIp, ...withoutIp];
+
+          setInterfaces(sorted);
+          // 默认选中第一个
+          if (sorted.length > 0) {
+            setSelected(sorted[0].name);
+          }
         })
         .catch((e) => {
           setError(e.message || t('networkSelect.error'));

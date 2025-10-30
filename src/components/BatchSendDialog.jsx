@@ -419,9 +419,9 @@ const BatchSendDialog = ({ visible, onConfirm, onCancel, status, onStop, packetD
                   {completedStats.stoppedManually 
                     ? t('batchSend.taskStopped')
                     : stopCondition === 'duration' 
-                      ? t('batchSend.taskCompletedByDuration', {duration: stopValue})
+                      ? t('batchSend.taskCompletedByDuration', {}, { duration: stopValue })
                       : stopCondition === 'count'
-                        ? t('batchSend.taskCompletedByCount', {count: stopValue.toLocaleString()})
+                        ? t('batchSend.taskCompletedByCount', {}, { count: stopValue.toLocaleString() })
                         : t('batchSend.taskCompleted')
                   }
                 </div>
