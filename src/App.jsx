@@ -14,6 +14,7 @@ import { useTranslation } from "./locales";
 import { useToast, ToastProvider } from "./contexts/ToastContext";
 import { NetworkInterfaceProvider, useNetworkInterface } from "./contexts/NetworkInterfaceContext";
 import { BatchTaskProvider, useBatchTask } from "./contexts/BatchTaskContext";
+import packageJson from '../package.json';
 
 function AppContent() {
   useTheme(); // 初始化主题系统
@@ -201,6 +202,12 @@ function AppContent() {
                   <div className="space-y-4">
                     <LanguageToggle />
                   </div>
+                </div>
+
+                {/* 软件版本显示 */}
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 flex items-center">
+                  <span className="text-base font-medium text-gray-800 dark:text-gray-200 mr-2">{t('config.versionLabel')}</span>
+                  <span className="text-sm text-blue-600 dark:text-blue-300">{packageJson.version}</span>
                 </div>
               </div>
             </div>

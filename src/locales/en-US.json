@@ -39,7 +39,8 @@
     "appearance": "Appearance Settings",
     "language": "Language Settings",
     "theme": "Theme Mode",
-    "interfaceLanguage": "Interface Language"
+    "interfaceLanguage": "Interface Language",
+    "versionLabel": "Current Version"
   },
   "theme": {
     "light": "Light",
