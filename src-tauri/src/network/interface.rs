@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
 use windows::{
-    core::{PSTR, PWSTR},
     Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR},
     Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH, GAA_FLAG_INCLUDE_PREFIX},
     Win32::Networking::WinSock::AF_UNSPEC,
@@ -149,16 +148,14 @@ impl NetworkInterface {
                 
                 // 获取适配器 GUID（AdapterName 字段）
                 let guid = if !adapter.AdapterName.is_null() {
-                    let guid_str = PSTR::from_raw(adapter.AdapterName);
-                    guid_str.to_string().ok()
+                    adapter.AdapterName.to_string().ok()
                 } else {
                     None
                 };
 
                 // 获取适配器友好名称（FriendlyName 字段）
                 let friendly_name = if !adapter.FriendlyName.is_null() {
-                    let name_str = PWSTR::from_raw(adapter.FriendlyName);
-                    name_str.to_string().ok()
+                    adapter.FriendlyName.to_string().ok()
                 } else {
                     None
                 };
