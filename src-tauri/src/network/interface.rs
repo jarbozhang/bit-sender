@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use windows::{
     core::{PSTR, PWSTR},
     Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR},
-    Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH, GAA_FLAG_INCLUDE_PREFIX},
+    Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, IP_ADAPTER_ADDRESSES, GAA_FLAG_INCLUDE_PREFIX},
     Win32::Networking::WinSock::AF_UNSPEC,
 };
 
@@ -127,7 +127,7 @@ impl NetworkInterface {
 
             // 分配缓冲区
             let mut buffer = vec![0u8; buffer_size as usize];
-            let adapter_addresses = buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
+            let adapter_addresses = buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES;
 
             // 第二次调用：获取实际数据
             let result = GetAdaptersAddresses(
