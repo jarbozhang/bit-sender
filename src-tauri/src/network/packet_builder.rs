@@ -641,6 +641,7 @@ impl PacketBuilder {
         !sum as u16
     }
 
+    #[allow(dead_code)]
     fn calculate_tcp_checksum(&self, packet: &[u8]) -> u16 {
         // 简化的 TCP 校验和计算
         let mut sum = 0u32;

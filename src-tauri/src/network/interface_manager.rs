@@ -369,7 +369,7 @@ impl InterfaceManager {
     fn restore_interface_macos(&self, snapshot: &InterfaceSnapshot) -> Result<()> {
         // 恢复IP配置
         for ip_config in &snapshot.ip_addresses {
-            let mut args = vec![
+            let args = vec![
                 "ifconfig", &snapshot.name, "inet", 
                 &ip_config.address, "netmask", &ip_config.netmask
             ];
@@ -482,7 +482,7 @@ impl InterfaceManager {
         }
     }
 
-    fn parse_macos_routes(&self, route_output: &str, interface_name: &str) -> Vec<RouteConfig> {
+    fn parse_macos_routes(&self, _route_output: &str, _interface_name: &str) -> Vec<RouteConfig> {
         // macOS路由解析实现
         Vec::new() // 简化实现
     }
@@ -513,12 +513,12 @@ impl InterfaceManager {
         ip_addresses
     }
 
-    fn parse_linux_routes(&self, route_output: &str, interface_name: &str) -> Vec<RouteConfig> {
+    fn parse_linux_routes(&self, _route_output: &str, _interface_name: &str) -> Vec<RouteConfig> {
         // Linux路由解析实现
         Vec::new() // 简化实现
     }
 
-    fn parse_windows_config(&self, config_str: &str) -> Vec<IpConfig> {
+    fn parse_windows_config(&self, _config_str: &str) -> Vec<IpConfig> {
         // Windows配置解析实现
         Vec::new() // 简化实现
     }

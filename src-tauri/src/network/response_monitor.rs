@@ -52,6 +52,7 @@ struct PendingTest {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum ExpectedResponse {
     IcmpEchoReply,
     ArpReply { target_ip: String },
@@ -197,7 +198,7 @@ impl ResponseMonitor {
             Err(_) => return,
         };
 
-        let pending_count = pending_guard.len();
+        let _pending_count = pending_guard.len();
         // 调试信息已移除以避免崩溃
 
         let mut matched_tests = Vec::new();
@@ -370,7 +371,7 @@ impl ResponseMonitor {
         running: Arc<AtomicBool>,
         pending_tests: Arc<Mutex<HashMap<String, PendingTest>>>,
         result_sender: Sender<TestResult>,
-        statistics: Arc<Mutex<MonitoringStatistics>>,
+        _statistics: Arc<Mutex<MonitoringStatistics>>,
     ) {
         while running.load(Ordering::Relaxed) {
             let mut timed_out_tests = Vec::new();
@@ -381,7 +382,7 @@ impl ResponseMonitor {
                     Err(_) => break,
                 };
                 
-                let now = Instant::now();
+                let _now = Instant::now();
                 let mut to_remove = Vec::new();
                 
                 for (test_id, pending_test) in pending_guard.iter() {

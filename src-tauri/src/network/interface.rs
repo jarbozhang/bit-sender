@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
 use windows::{
-    core::*,
-    Win32::NetworkManagement::IpHelper::*,
+    core::{PSTR, PWSTR},
+    Win32::Foundation::{ERROR_BUFFER_OVERFLOW, NO_ERROR},
+    Win32::NetworkManagement::IpHelper::{GetAdaptersAddresses, IP_ADAPTER_ADDRESSES_LH, GAA_FLAG_INCLUDE_PREFIX},
+    Win32::Networking::WinSock::AF_UNSPEC,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,7 +113,7 @@ impl NetworkInterface {
             
             // 第一次调用：获取所需缓冲区大小
             let result = GetAdaptersAddresses(
-                AF_UNSPEC.0,
+                AF_UNSPEC.0 as u32,
                 flags,
                 None,
                 None,
@@ -119,24 +121,24 @@ impl NetworkInterface {
             );
 
             // 如果第一次调用返回的不是 ERROR_BUFFER_OVERFLOW，说明可能没有适配器或出错
-            if result != ERROR_BUFFER_OVERFLOW && result != NO_ERROR {
+            if result != ERROR_BUFFER_OVERFLOW.0 && result != NO_ERROR.0 {
                 return Ok(HashMap::new()); // 返回空映射而不是错误，允许降级处理
             }
 
             // 分配缓冲区
             let mut buffer = vec![0u8; buffer_size as usize];
-            let adapter_addresses = buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES;
+            let adapter_addresses = buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
 
             // 第二次调用：获取实际数据
             let result = GetAdaptersAddresses(
-                AF_UNSPEC.0,
+                AF_UNSPEC.0 as u32,
                 flags,
                 None,
                 Some(adapter_addresses),
                 &mut buffer_size,
             );
 
-            if result != NO_ERROR {
+            if result != NO_ERROR.0 {
                 return Ok(HashMap::new()); // 返回空映射，允许降级处理
             }
 
@@ -147,7 +149,7 @@ impl NetworkInterface {
                 
                 // 获取适配器 GUID（AdapterName 字段）
                 let guid = if !adapter.AdapterName.is_null() {
-                    let guid_str = PWSTR::from_raw(adapter.AdapterName);
+                    let guid_str = PSTR::from_raw(adapter.AdapterName);
                     guid_str.to_string().ok()
                 } else {
                     None
@@ -162,24 +164,17 @@ impl NetworkInterface {
                 };
 
                 // 获取 MAC 地址
-                let mac_address = if adapter.PhysicalAddressLength > 0 && !adapter.PhysicalAddress.is_null() {
-                    let mac_bytes = std::slice::from_raw_parts(
-                        adapter.PhysicalAddress,
-                        adapter.PhysicalAddressLength as usize,
-                    );
-                    
-                    if mac_bytes.len() == 6 {
+                let mac_address = if adapter.PhysicalAddressLength > 0 {
+                    let len = adapter.PhysicalAddressLength as usize;
+                    let mac_bytes = &adapter.PhysicalAddress[..len.min(adapter.PhysicalAddress.len())];
+                    if mac_bytes.len() >= 6 {
                         Some(format!(
                             "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
                             mac_bytes[0], mac_bytes[1], mac_bytes[2],
                             mac_bytes[3], mac_bytes[4], mac_bytes[5]
                         ))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+                    } else { None }
+                } else { None };
 
                 // 存储到映射表：使用 GUID 作为主键
                 if let Some(guid) = guid {
@@ -245,7 +240,7 @@ impl NetworkInterface {
     }
 
     pub fn send_packet(&mut self, packet: &[u8]) -> Result<()> {
-        let mut cap = match pcap::Capture::from_device(self.device.clone()) {
+        let cap = match pcap::Capture::from_device(self.device.clone()) {
             Ok(cap) => cap,
             Err(e) => {
                 return Err(anyhow!(

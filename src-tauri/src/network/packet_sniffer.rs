@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::collections::{HashMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crossbeam_channel::{bounded, Receiver, Sender, select};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use anyhow::{Result, anyhow};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -214,7 +214,7 @@ impl PacketSniffer {
                         }
                         continue;
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         // 不要立即退出，尝试继续
                         std::thread::sleep(std::time::Duration::from_millis(100));
                         continue;
@@ -311,8 +311,8 @@ impl PacketSniffer {
         let total_len = ((data[2] as u16) << 8) | (data[3] as u16);
         let header_len = ((data[0] & 0x0f) * 4) as usize;
         let ttl = data[8];
-        let flags = (data[6] & 0xe0) >> 5;
-        let fragment_offset = (((data[6] & 0x1f) as u16) << 8) | (data[7] as u16);
+        let _flags = (data[6] & 0xe0) >> 5;
+        let _fragment_offset = (((data[6] & 0x1f) as u16) << 8) | (data[7] as u16);
         
         let mut proto_name = "ipv4".to_string();
         let mut src_port = None;
@@ -546,7 +546,7 @@ impl PacketSniffer {
 
 // 全局的数据包嗅探器管理器
 pub struct SnifferManager {
-    sniffer: Arc<Mutex<Option<PacketSniffer>>>,
+    _sniffer: Arc<Mutex<Option<PacketSniffer>>>,
     capture_thread: Option<std::thread::JoinHandle<()>>,
     // 将数据包通道的接收端保留在管理器中
     packet_receiver: Option<Receiver<CapturedPacket>>,
@@ -561,7 +561,7 @@ pub struct SnifferManager {
 impl SnifferManager {
     pub fn new() -> Self {
         Self {
-            sniffer: Arc::new(Mutex::new(None)),
+            _sniffer: Arc::new(Mutex::new(None)),
             capture_thread: None,
             packet_receiver: None,
             statistics: None,
@@ -716,8 +716,8 @@ impl SnifferManager {
         }
         
         let filters_arc = Arc::new(Mutex::new(filters));
-        let mut raw_packet_count = 0u64;
-        let mut raw_byte_count = 0u64;
+        let mut _raw_packet_count = 0u64;
+        let mut _raw_byte_count = 0u64;
         let mut filtered_packet_count = 0u64;
         let mut filtered_byte_count = 0u64;
         let start_time = SystemTime::now();
@@ -725,8 +725,8 @@ impl SnifferManager {
         while running.load(Ordering::Relaxed) {
             match capture.next_packet() {
                 Ok(packet) => {
-                    raw_packet_count += 1;
-                    raw_byte_count += packet.data.len() as u64;
+                    _raw_packet_count += 1;
+                    _raw_byte_count += packet.data.len() as u64;
 
                     // 解析数据包以便检查协议
                     let parsed_packet = match PacketSniffer::parse_packet_static(&packet) {
