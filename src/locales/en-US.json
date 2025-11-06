@@ -123,6 +123,7 @@
     "packetName": "Packet Name",
     "protocol": "Protocol",
     "payload": "Payload",
+    "selectAll": "Select All / Deselect All",
     "addCurrent": "Add Current Packet",
     "addEmpty": "Add Empty Packet",
     "batchImport": "Batch Import",

@@ -103,6 +103,16 @@ const PacketSequenceManager = ({
     setSequence(newSequence);
   };
 
+  // 全选/全不选
+  const handleSelectAll = (checked) => {
+    const newSequence = sequence.map(packet => ({ ...packet, enabled: checked }));
+    setSequence(newSequence);
+  };
+
+  // 判断是否全选
+  const isAllSelected = sequence.length > 0 && sequence.every(p => p.enabled);
+  const isSomeSelected = sequence.some(p => p.enabled) && !isAllSelected;
+
   // 批量导入处理
   const handleBatchImport = () => {
     if (!batchImportText.trim()) {
@@ -466,6 +476,27 @@ const PacketSequenceManager = ({
             </div>
           ) : (
             <div className="space-y-2">
+              {/* 全选/全不选 checkbox */}
+              <div className="flex items-center gap-2 px-2 py-2 mb-2 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-600">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  ref={input => {
+                    if (input) {
+                      input.indeterminate = isSomeSelected;
+                    }
+                  }}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer" onClick={() => handleSelectAll(!isAllSelected)}>
+                  {t('sequence.selectAll')}
+                </label>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  ({sequence.filter(p => p.enabled).length}/{sequence.length})
+                </span>
+              </div>
+              
               {sequence.map((packet, index) => (
                 <div
                   key={packet.id}

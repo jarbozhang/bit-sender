@@ -123,6 +123,7 @@
     "packetName": "数据包名称",
     "protocol": "协议",
     "payload": "载荷",
+    "selectAll": "全选/全不选",
     "addCurrent": "添加当前数据包",
     "addEmpty": "添加空白数据包",
     "batchImport": "批量导入",
