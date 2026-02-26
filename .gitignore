@@ -25,3 +25,7 @@ dist-ssr
 
 target/*
 src-tauri/target/*
+
+# Claude
+.claude/
+CLAUDE.md
