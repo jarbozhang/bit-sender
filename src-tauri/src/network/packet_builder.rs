@@ -671,11 +671,242 @@ impl PacketBuilder {
                 sum += (data[i] as u32) << 8;
             }
         }
-        
+
         while sum >> 16 != 0 {
             sum = (sum & 0xFFFF) + (sum >> 16);
         }
-        
+
         !sum as u16
     }
-} 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn make_packet(protocol: &str, fields: Vec<(&str, &str)>, payload: Option<&str>) -> PacketBuilder {
+        let mut map = HashMap::new();
+        for (k, v) in fields {
+            map.insert(k.to_string(), v.to_string());
+        }
+        PacketBuilder::new(PacketData {
+            protocol: protocol.to_string(),
+            fields: map,
+            payload: payload.map(|s| s.to_string()),
+        })
+    }
+
+    // ── parse_mac ─────────────────────────────────────────────
+
+    #[test]
+    fn parse_mac_valid() {
+        let pb = make_packet("ethernet", vec![], None);
+        let result = pb.parse_mac("AA:BB:CC:DD:EE:FF").unwrap();
+        assert_eq!(result, vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+    }
+
+    #[test]
+    fn parse_mac_broadcast() {
+        let pb = make_packet("ethernet", vec![], None);
+        let result = pb.parse_mac("ff:ff:ff:ff:ff:ff").unwrap();
+        assert_eq!(result, vec![0xFF; 6]);
+    }
+
+    #[test]
+    fn parse_mac_invalid_length() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert!(pb.parse_mac("AA:BB:CC").is_err());
+    }
+
+    #[test]
+    fn parse_mac_invalid_chars() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert!(pb.parse_mac("GG:HH:II:JJ:KK:LL").is_err());
+    }
+
+    // ── parse_ip ──────────────────────────────────────────────
+
+    #[test]
+    fn parse_ip_valid() {
+        let pb = make_packet("ethernet", vec![], None);
+        let result = pb.parse_ip("192.168.1.1").unwrap();
+        assert_eq!(result, vec![192, 168, 1, 1]);
+    }
+
+    #[test]
+    fn parse_ip_zeros() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert_eq!(pb.parse_ip("0.0.0.0").unwrap(), vec![0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn parse_ip_empty_string() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert_eq!(pb.parse_ip("").unwrap(), vec![0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn parse_ip_invalid_format() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert!(pb.parse_ip("192.168.1").is_err());
+    }
+
+    #[test]
+    fn parse_ip_invalid_octet() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert!(pb.parse_ip("999.0.0.1").is_err());
+    }
+
+    // ── parse_hex ─────────────────────────────────────────────
+
+    #[test]
+    fn parse_hex_valid() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert_eq!(pb.parse_hex("0800").unwrap(), vec![0x08, 0x00]);
+    }
+
+    #[test]
+    fn parse_hex_with_spaces() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert_eq!(pb.parse_hex("08 00").unwrap(), vec![0x08, 0x00]);
+    }
+
+    #[test]
+    fn parse_hex_with_colons() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert_eq!(pb.parse_hex("08:00").unwrap(), vec![0x08, 0x00]);
+    }
+
+    #[test]
+    fn parse_hex_odd_length_pads() {
+        let pb = make_packet("ethernet", vec![], None);
+        // "ABC" → "0ABC" → [0x0A, 0xBC]
+        assert_eq!(pb.parse_hex("ABC").unwrap(), vec![0x0A, 0xBC]);
+    }
+
+    #[test]
+    fn parse_hex_invalid_chars() {
+        let pb = make_packet("ethernet", vec![], None);
+        assert!(pb.parse_hex("ZZZZ").is_err());
+    }
+
+    // ── build: unknown protocol ───────────────────────────────
+
+    #[test]
+    fn build_unknown_protocol_errors() {
+        let pb = make_packet("foobar", vec![], None);
+        assert!(pb.build().is_err());
+    }
+
+    // ── build_ethernet_packet ─────────────────────────────────
+
+    #[test]
+    fn build_ethernet_minimum_frame_size() {
+        let pb = make_packet(
+            "ethernet",
+            vec![
+                ("dst_mac", "FF:FF:FF:FF:FF:FF"),
+                ("src_mac", "00:11:22:33:44:55"),
+                ("ether_type", "0800"),
+            ],
+            None,
+        );
+        let packet = pb.build().unwrap();
+        assert!(packet.len() >= 64, "Ethernet frame must be >= 64 bytes, got {}", packet.len());
+    }
+
+    #[test]
+    fn build_ethernet_header_correct() {
+        let pb = make_packet(
+            "ethernet",
+            vec![
+                ("dst_mac", "FF:FF:FF:FF:FF:FF"),
+                ("src_mac", "AA:BB:CC:DD:EE:00"),
+                ("ether_type", "0806"),
+            ],
+            None,
+        );
+        let packet = pb.build().unwrap();
+        // dst mac
+        assert_eq!(&packet[0..6], &[0xFF; 6]);
+        // src mac
+        assert_eq!(&packet[6..12], &[0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x00]);
+        // ether type
+        assert_eq!(&packet[12..14], &[0x08, 0x06]);
+    }
+
+    // ── build_arp_packet ──────────────────────────────────────
+
+    #[test]
+    fn build_arp_ethertype_0806() {
+        let pb = make_packet(
+            "arp",
+            vec![
+                ("dst_mac", "FF:FF:FF:FF:FF:FF"),
+                ("src_mac", "00:11:22:33:44:55"),
+                ("srcIp", "192.168.1.1"),
+                ("dstIp", "192.168.1.2"),
+            ],
+            None,
+        );
+        let packet = pb.build().unwrap();
+        // EtherType at bytes 12-13 should be 0x0806
+        assert_eq!(&packet[12..14], &[0x08, 0x06]);
+    }
+
+    #[test]
+    fn build_arp_minimum_frame_size() {
+        let pb = make_packet(
+            "arp",
+            vec![
+                ("dst_mac", "FF:FF:FF:FF:FF:FF"),
+                ("src_mac", "00:11:22:33:44:55"),
+                ("srcIp", "192.168.1.1"),
+                ("dstIp", "192.168.1.2"),
+            ],
+            None,
+        );
+        let packet = pb.build().unwrap();
+        assert!(packet.len() >= 60, "ARP frame must be >= 60 bytes, got {}", packet.len());
+    }
+
+    // ── IP checksum ───────────────────────────────────────────
+
+    #[test]
+    fn ip_checksum_known_value() {
+        let pb = make_packet("ethernet", vec![], None);
+        // RFC 1071 example: all zeros → checksum = 0xFFFF
+        let data = [0u8; 20];
+        let cksum = pb.calculate_ip_checksum(&data);
+        assert_eq!(cksum, 0xFFFF);
+    }
+
+    #[test]
+    fn ip_checksum_roundtrip() {
+        // Build an IPv4 packet and verify the header checksum validates to 0
+        let pb = make_packet(
+            "ipv4",
+            vec![
+                ("dst_mac", "FF:FF:FF:FF:FF:FF"),
+                ("src_mac", "00:11:22:33:44:55"),
+                ("srcIp", "10.0.0.1"),
+                ("dstIp", "10.0.0.2"),
+                ("ttl", "64"),
+                ("protocol", "6"),
+            ],
+            None,
+        );
+        let packet = pb.build().unwrap();
+        // Verify IP header checksum: sum of all 16-bit words in IP header should be 0xFFFF
+        let ip_header = &packet[14..34]; // 20 bytes
+        let mut sum = 0u32;
+        for i in (0..20).step_by(2) {
+            sum += ((ip_header[i] as u32) << 8) + ip_header[i + 1] as u32;
+        }
+        while sum >> 16 != 0 {
+            sum = (sum & 0xFFFF) + (sum >> 16);
+        }
+        assert_eq!(sum as u16, 0xFFFF, "IP header checksum should validate to 0xFFFF");
+    }
+}
