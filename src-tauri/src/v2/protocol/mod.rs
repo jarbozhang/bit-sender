@@ -9,6 +9,7 @@ mod arp;
 mod ethernet;
 mod icmp;
 mod ipv4;
+mod ipv6;
 mod tcp;
 mod udp;
 
@@ -16,6 +17,7 @@ pub use arp::ArpSpec;
 pub use ethernet::{build_ethernet, EthernetSpec};
 pub use icmp::IcmpSpec;
 pub use ipv4::Ipv4Spec;
+pub use ipv6::Ipv6Spec;
 pub use tcp::TcpSpec;
 pub use udp::UdpSpec;
 
@@ -58,6 +60,7 @@ pub enum PacketSpec {
     Tcp(TcpSpec),
     Udp(UdpSpec),
     Icmp(IcmpSpec),
+    Ipv6(Ipv6Spec),
 }
 
 impl PacketSpec {
@@ -70,6 +73,7 @@ impl PacketSpec {
             PacketSpec::Tcp(s) => tcp::build_tcp(s),
             PacketSpec::Udp(s) => udp::build_udp(s),
             PacketSpec::Icmp(s) => icmp::build_icmp(s),
+            PacketSpec::Ipv6(s) => ipv6::build_ipv6(s),
         }
     }
 }

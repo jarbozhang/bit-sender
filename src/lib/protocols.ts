@@ -4,7 +4,7 @@ import type { PacketSpec } from "../api/bindings";
 // 字段命名与后端 spec 完全一致（单一事实来源由 bindings.ts 保证，buildSpec 返回 PacketSpec
 // 时若漏填/错填字段，TS 编译即失败）。
 
-export type ProtoKey = "ethernet" | "arp" | "ipv4" | "tcp" | "udp" | "icmp";
+export type ProtoKey = "ethernet" | "arp" | "ipv4" | "ipv6" | "tcp" | "udp" | "icmp";
 
 /** 字段种类，决定输入校验与构造时的转换。 */
 export type FieldKind =
@@ -16,11 +16,12 @@ export type FieldKind =
   | "flag" // 布尔（TCP flags）
   | "optdec"; // 可选十进制：空 → null（自动算，如校验和）
 
-export type GroupKey = "eth" | "ip" | "l4" | "arp" | "payload";
+export type GroupKey = "eth" | "ip" | "ip6" | "l4" | "arp" | "payload";
 
 export const GROUPS: Record<GroupKey, { tag: string; accent: string }> = {
   eth: { tag: "ETHERNET II", accent: "text-violet" },
   ip: { tag: "INTERNET PROTOCOL V4", accent: "text-cyan" },
+  ip6: { tag: "INTERNET PROTOCOL V6", accent: "text-cyan" },
   l4: { tag: "TRANSPORT", accent: "text-amber" },
   arp: { tag: "ADDRESS RESOLUTION", accent: "text-amber" },
   payload: { tag: "PAYLOAD", accent: "text-dim" },
@@ -98,6 +99,21 @@ export const PROTOCOLS: ProtoDef[] = [
       { key: "checksum", label: "校验和", kind: "optdec", group: "ip", def: "", placeholder: "留空自动算" },
       { key: "src_ip", label: "源 IP", kind: "ip", group: "ip", def: "192.168.1.100" },
       { key: "dst_ip", label: "目的 IP", kind: "ip", group: "ip", def: "192.168.1.1" },
+      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
+    ],
+  },
+  {
+    key: "ipv6",
+    label: "IPv6",
+    hint: "0x86DD",
+    fields: [
+      ...ETH,
+      { key: "src_ip", label: "源 IPv6", kind: "ip", group: "ip6", def: "2001:db8::1" },
+      { key: "dst_ip", label: "目的 IPv6", kind: "ip", group: "ip6", def: "2001:db8::2" },
+      { key: "traffic_class", label: "流量类别", kind: "dec", group: "ip6", def: "0" },
+      { key: "flow_label", label: "流标签", kind: "dec", group: "ip6", def: "0" },
+      { key: "next_header", label: "下一头部", kind: "dec", group: "ip6", def: "59", placeholder: "59=无 58=ICMPv6 6=TCP 17=UDP" },
+      { key: "hop_limit", label: "跳数限制", kind: "dec", group: "ip6", def: "64" },
       { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
     ],
   },
@@ -219,6 +235,19 @@ export function buildSpec(
         ttl: dec("ttl"),
         protocol: dec("protocol"),
         checksum: optdec("checksum"),
+        src_ip: str("src_ip"),
+        dst_ip: str("dst_ip"),
+        payload_hex: str("payload_hex"),
+      };
+    case "ipv6":
+      return {
+        kind: "ipv6",
+        dst_mac: str("dst_mac"),
+        src_mac: str("src_mac"),
+        traffic_class: dec("traffic_class"),
+        flow_label: dec("flow_label"),
+        next_header: dec("next_header"),
+        hop_limit: dec("hop_limit"),
         src_ip: str("src_ip"),
         dst_ip: str("dst_ip"),
         payload_hex: str("payload_hex"),

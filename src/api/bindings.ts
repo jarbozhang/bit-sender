@@ -230,6 +230,22 @@ dscp_ecn: number; identification: number;
  */
 flags: number; fragment_offset: number; ttl: number; protocol: number; checksum: number | null; src_ip: string; dst_ip: string; payload_hex: string }
 /**
+ * IPv6 帧规格。以太网头 + IPv6 固定头(40) + payload。
+ */
+export type Ipv6Spec = { dst_mac: string; src_mac: string; 
+/**
+ * 流量类别（8 位）。
+ */
+traffic_class: number; 
+/**
+ * 流标签（低 20 位有效）。
+ */
+flow_label: number; 
+/**
+ * 下一个头部（59=无, 58=ICMPv6, 6=TCP, 17=UDP）。
+ */
+next_header: number; hop_limit: number; src_ip: string; dst_ip: string; payload_hex: string }
+/**
  * 监控聚合统计。avg/min/max 仅对 success 的 rtt 累计。
  */
 export type MonitorStats = { total: number; success: number; timeout: number; avg_rtt_ms: number; min_rtt_ms: number; max_rtt_ms: number }
@@ -239,7 +255,7 @@ export type MonitorStats = { total: number; success: number; timeout: number; av
  * 注意：标签用 `kind` 而非 `protocol`，因为 `Ipv4Spec` 已有名为 `protocol` 的
  * IP 协议号字段，撞名会让 TS 联合类型坍缩为 never。
  */
-export type PacketSpec = ({ kind: "ethernet" } & EthernetSpec) | ({ kind: "arp" } & ArpSpec) | ({ kind: "ipv4" } & Ipv4Spec) | ({ kind: "tcp" } & TcpSpec) | ({ kind: "udp" } & UdpSpec) | ({ kind: "icmp" } & IcmpSpec)
+export type PacketSpec = ({ kind: "ethernet" } & EthernetSpec) | ({ kind: "arp" } & ArpSpec) | ({ kind: "ipv4" } & Ipv4Spec) | ({ kind: "tcp" } & TcpSpec) | ({ kind: "udp" } & UdpSpec) | ({ kind: "icmp" } & IcmpSpec) | ({ kind: "ipv6" } & Ipv6Spec)
 /**
  * 单发结果：发出的字节数 + 出口网卡名。
  */
