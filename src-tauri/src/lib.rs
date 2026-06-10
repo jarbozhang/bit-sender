@@ -2,6 +2,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 pub mod network;
+pub mod v2;
 
 use network::{PacketData, SendResult, NetworkInterface, BatchTaskStatus, BatchTaskHandle, TaskMap, SnifferState, MonitorState, InterfaceManagerState, SequencePacket, PacketSequence, SequenceTaskStatus, SequenceTaskHandle, SequenceTaskMap};
 use network::interface::InterfaceInfo;
@@ -840,8 +841,33 @@ pub fn run() {
             stop_response_monitoring,
             get_monitoring_status,
             get_monitoring_statistics,
-            get_test_results
+            get_test_results,
+            v2::commands::build_packet_preview_v2,
+            v2::commands::list_interfaces_v2,
+            v2::commands::send_packet_v2
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod specta_export {
+    /// 用 tauri-specta 在 `cargo test` 时生成前端 TS 绑定。
+    /// 放在测试里，无需启动 GUI 即可在 CI 中产出 `src/api/bindings.ts`。
+    #[test]
+    fn export_typescript_bindings() {
+        let builder = tauri_specta::Builder::<tauri::Wry>::new()
+            .commands(tauri_specta::collect_commands![
+                crate::v2::commands::build_packet_preview_v2,
+                crate::v2::commands::list_interfaces_v2,
+                crate::v2::commands::send_packet_v2
+            ]);
+        builder
+            .export(
+                specta_typescript::Typescript::default()
+                    .bigint(specta_typescript::BigIntExportBehavior::Number),
+                "../src/api/bindings.ts",
+            )
+            .expect("导出 TS 绑定失败");
+    }
 }

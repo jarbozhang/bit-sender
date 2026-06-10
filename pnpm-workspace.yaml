@@ -1,0 +1,4 @@
+# pnpm 11 用 allowBuilds 控制哪些依赖可运行安装脚本（替代旧的 onlyBuiltDependencies）。
+# esbuild 需要它来就位原生二进制；允许以避免 ERR_PNPM_IGNORED_BUILDS 门禁卡住 install（v1 旧痛点）。
+allowBuilds:
+  esbuild: true

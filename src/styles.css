@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #05080a;
+  color: #dde8ed;
+  font-family: "IBM Plex Sans", sans-serif;
+  /* 控制台氛围：顶部琥珀微光 + 底部青光 */
+  background-image:
+    radial-gradient(900px 500px at 78% -8%, rgba(255, 178, 36, 0.07), transparent 60%),
+    radial-gradient(1100px 700px at 12% 110%, rgba(54, 224, 207, 0.06), transparent 55%);
+  background-attachment: fixed;
+  overflow: hidden;
+}
+
+/* 工程网格 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(27, 42, 51, 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27, 42, 51, 0.45) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* 细噪点 */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #294049;
+  border-radius: 10px;
+  border: 3px solid #090f12;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes bootin {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.boot {
+  animation: bootin 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.led {
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+/* 示波器扫描线 */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 2px,
+    rgba(0, 0, 0, 0.22) 2px 4px
+  );
+  opacity: 0.5;
+}

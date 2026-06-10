@@ -34,6 +34,13 @@ tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 crossbeam-channel = "0.5"
 mac_address = "1.1"
+specta = { version = "2.0.0-rc.22", features = ["derive"] }
+specta-typescript = "0.0.9"
+tauri-specta = { version = "2.0.0-rc.21", features = ["derive", "typescript"] }
+
+[dev-dependencies]
+# 仅用于测试中交叉验证手写 builder 输出；生产 builder 不依赖它。
+etherparse = "0.20"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.56", features = [

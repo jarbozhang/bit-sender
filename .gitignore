@@ -29,3 +29,4 @@ src-tauri/target/*
 # Claude
 .claude/
 CLAUDE.md
+.compound-engineering/*.local.yaml

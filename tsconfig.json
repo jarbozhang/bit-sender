@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
+  },
+  "//": "v2 是 TS；allowJs:false 让 tsc 只检查 .ts/.tsx，自动忽略 v1 遗留的 .jsx（M8 删除）。",
+  "include": ["src"]
+}

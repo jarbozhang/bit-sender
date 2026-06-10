@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BitSender v2 · Industrial Signal Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* ── 深色信号控制台配色 ── */
+    --void: #05080a;
+    --bg: #090f12;
+    --panel: #0d141a;
+    --panel-2: #0f1820;
+    --elevated: #142029;
+    --line: #1b2a33;
+    --line-bright: #294049;
+    --text: #dde8ed;
+    --text-dim: #7e919c;
+    --text-faint: #4a5a64;
+    --amber: #ffb224;
+    --amber-dim: #b87d18;
+    --amber-glow: rgba(255, 178, 36, .45);
+    --cyan: #36e0cf;
+    --cyan-glow: rgba(54, 224, 207, .35);
+    --green: #46d483;
+    --red: #ff5d6c;
+    --violet: #8b7dff;
+
+    --font-display: 'Chakra Petch', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-ui: 'IBM Plex Sans', sans-serif;
+
+    --rail-w: 60px;
+    --radius: 4px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--void);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    /* 控制台氛围：底部冷光 + 顶部琥珀微光 + 工程网格 */
+    background-image:
+      radial-gradient(900px 500px at 78% -8%, rgba(255, 178, 36, .07), transparent 60%),
+      radial-gradient(1100px 700px at 12% 110%, rgba(54, 224, 207, .06), transparent 55%),
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: auto, auto, 56px 56px, 56px 56px;
+    background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+  }
+  /* 网格降到很弱，只留氛围 */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      linear-gradient(var(--void) 1px, transparent 1px),
+      linear-gradient(90deg, var(--void) 1px, transparent 1px);
+    background-size: 56px 56px;
+    opacity: .82;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* 细噪点 overlay */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 1; opacity: .035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .app {
+    position: relative; z-index: 2;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 52px 1fr 26px;
+  }
+
+  /* ═══════════ 顶部状态栏 ═══════════ */
+  .statusbar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 0 18px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border-bottom: 1px solid var(--line-bright);
+    box-shadow: 0 1px 0 0 rgba(0,0,0,.5);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand .mark {
+    font-family: var(--font-display); font-weight: 700; font-size: 18px;
+    letter-spacing: .14em; color: var(--text);
+  }
+  .brand .mark b { color: var(--amber); text-shadow: 0 0 14px var(--amber-glow); }
+  .brand .ver {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    color: var(--cyan); border: 1px solid color-mix(in srgb, var(--cyan) 35%, transparent);
+    padding: 1px 6px; border-radius: 3px; letter-spacing: .08em;
+    background: var(--cyan-glow); background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  }
+
+  .nic {
+    margin-left: 6px;
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--font-mono); font-size: 12px;
+    background: var(--elevated);
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  }
+  .nic:hover { border-color: var(--amber-dim); box-shadow: 0 0 0 1px var(--amber-dim), 0 0 18px -6px var(--amber-glow); }
+  .nic .led {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 8px var(--green);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  .nic .name { color: var(--text); font-weight: 600; }
+  .nic .ip { color: var(--text-dim); }
+  .nic .sep { color: var(--text-faint); }
+  .nic .chev { color: var(--text-faint); font-size: 10px; }
+
+  .sb-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .iconbtn {
+    width: 32px; height: 32px; display: grid; place-items: center;
+    color: var(--text-dim); background: transparent;
+    border: 1px solid transparent; border-radius: var(--radius);
+    cursor: pointer; transition: all .15s; font-size: 15px;
+  }
+  .iconbtn:hover { color: var(--amber); border-color: var(--line-bright); background: var(--elevated); }
+  .iconbtn.on { color: var(--amber); }
+
+  /* ═══════════ 工作区 ═══════════ */
+  .workspace { display: grid; grid-template-columns: var(--rail-w) 1fr; min-height: 0; }
+
+  /* 左侧 icon rail */
+  .rail {
+    background: var(--panel); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 14px 0; gap: 6px;
+  }
+  .rail .r {
+    width: 42px; height: 42px; border-radius: var(--radius);
+    display: grid; place-items: center; cursor: pointer;
+    color: var(--text-faint); position: relative;
+    transition: color .15s, background .15s;
+  }
+  .rail .r svg { width: 20px; height: 20px; }
+  .rail .r:hover { color: var(--text-dim); background: var(--elevated); }
+  .rail .r.active { color: var(--amber); background: color-mix(in srgb, var(--amber) 10%, transparent); }
+  .rail .r.active::before {
+    content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px;
+    width: 3px; border-radius: 0 3px 3px 0;
+    background: var(--amber); box-shadow: 0 0 12px var(--amber-glow);
+  }
+  .rail .spacer { flex: 1; }
+  .rail .r .tip {
+    position: absolute; left: 50px; white-space: nowrap;
+    font-family: var(--font-ui); font-size: 11px; color: var(--text);
+    background: var(--elevated); border: 1px solid var(--line-bright);
+    padding: 3px 8px; border-radius: 3px; opacity: 0; transform: translateX(-4px);
+    transition: all .15s; pointer-events: none; z-index: 20;
+  }
+  .rail .r:hover .tip { opacity: 1; transform: translateX(0); }
+
+  /* 主区 */
+  main { min-width: 0; overflow-y: auto; padding: 18px 22px 30px; }
+  main::-webkit-scrollbar { width: 10px; }
+  main::-webkit-scrollbar-thumb { background: var(--line-bright); border-radius: 10px; border: 3px solid var(--bg); }
+
+  .view-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .view-head h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: 15px;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--text);
+  }
+  .view-head .crumb { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); letter-spacing: .05em; }
+  .view-head .dash { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); }
+
+  /* 协议选择 tab */
+  .protos { display: flex; gap: 2px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .proto {
+    font-family: var(--font-display); font-weight: 500; font-size: 12px;
+    letter-spacing: .1em; color: var(--text-dim);
+    padding: 9px 18px; cursor: pointer; position: relative;
+    border: 1px solid transparent; border-bottom: none; background: transparent;
+    transition: color .15s;
+  }
+  .proto:hover { color: var(--text); }
+  .proto.active { color: var(--amber); }
+  .proto.active::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: var(--amber); box-shadow: 0 0 10px var(--amber-glow);
+  }
+  .proto .x { font-family: var(--font-mono); font-size: 9px; opacity: .6; margin-left: 6px; }
+
+  /* 编辑器主网格：字段 + 示波器 */
+  .editor { display: grid; grid-template-columns: 1fr 420px; gap: 18px; align-items: start; }
+  @media (max-width: 1100px) { .editor { grid-template-columns: 1fr; } }
+
+  .fieldgroups { display: flex; flex-direction: column; gap: 14px; }
+
+  .group {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .group > header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px; border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--elevated) 60%, transparent);
+  }
+  .group > header .tag {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--cyan);
+  }
+  .group > header .meta { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
+  .group > header .bar { width: 18px; height: 2px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan-glow); }
+
+  .grid-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); }
+  .grid-fields.three { grid-template-columns: repeat(3, 1fr); }
+  .field { background: var(--panel); padding: 9px 14px; display: flex; flex-direction: column; gap: 4px; transition: background .15s; }
+  .field:hover { background: var(--panel-2); }
+  .field label {
+    font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--text-dim); display: flex; align-items: center; gap: 6px;
+  }
+  .field label .q {
+    width: 13px; height: 13px; border-radius: 50%; display: inline-grid; place-items: center;
+    font-size: 9px; color: var(--text-faint); border: 1px solid var(--line-bright); cursor: help;
+  }
+  .field input {
+    font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--line-bright); border-radius: 3px;
+    padding: 6px 9px; outline: none; transition: all .15s; width: 100%;
+  }
+  .field input::placeholder { color: var(--text-faint); }
+  .field input:focus { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim), 0 0 16px -7px var(--amber-glow); background: #0a1115; }
+  .field input.mac, .field input.ip, .field input.num { letter-spacing: .04em; }
+  .field .hint { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); }
+  .field.auto input { color: var(--cyan); }
+
+  .payload { padding: 12px 14px; }
+  .payload label { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim); display:block; margin-bottom: 6px; }
+  .payload textarea {
+    width: 100%; height: 64px; resize: none;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.7;
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--line-bright); border-radius: 3px; padding: 8px 10px; outline: none;
+  }
+  .payload textarea:focus { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim); }
+
+  /* ── 示波器 / PACKET SCOPE ── */
+  .scope-wrap { position: sticky; top: 0; display: flex; flex-direction: column; gap: 14px; }
+
+  .scope {
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(54,224,207,.06), transparent 70%),
+      linear-gradient(180deg, #08110f, #060c0c);
+    border: 1px solid var(--line-bright); border-radius: var(--radius);
+    overflow: hidden; position: relative;
+    box-shadow: inset 0 0 60px -20px rgba(54,224,207,.18);
+  }
+  /* 扫描线 */
+  .scope::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.22) 2px 4px);
+    opacity: .5;
+  }
+  .scope > header {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    border-bottom: 1px solid var(--line); position: relative; z-index: 1;
+  }
+  .scope > header .t { font-family: var(--font-display); font-size: 11px; letter-spacing: .16em; color: var(--cyan); text-shadow: 0 0 10px var(--cyan-glow); }
+  .scope > header .len { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+  .scope > header .len b { color: var(--cyan); }
+
+  .hex { padding: 12px 14px; position: relative; z-index: 1; font-family: var(--font-mono); font-size: 12px; line-height: 1.85; }
+  .hexrow { display: grid; grid-template-columns: 42px 1fr 130px; gap: 14px; }
+  .hexrow .off { color: var(--text-faint); }
+  .hexrow .bytes { color: var(--text); letter-spacing: .06em; }
+  .hexrow .bytes .b { transition: color .2s, text-shadow .2s; }
+  .hexrow .bytes .eth { color: var(--violet); }      /* 以太网头 */
+  .hexrow .bytes .ip  { color: var(--cyan); }         /* IP 头 */
+  .hexrow .bytes .l4  { color: var(--amber); text-shadow: 0 0 10px var(--amber-glow); } /* 传输层（聚焦） */
+  .hexrow .bytes .pad { color: var(--text-faint); }
+  .hexrow .ascii { color: var(--text-dim); letter-spacing: .12em; }
+
+  .legend { display: flex; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--line); position: relative; z-index: 1; }
+  .legend span { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* 发送控制台 */
+  .console {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 14px;
+  }
+  .console .row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .console .row label { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); }
+  .freq {
+    margin-left: auto; display: flex; align-items: center; gap: 0;
+    border: 1px solid var(--line-bright); border-radius: 3px; overflow: hidden;
+  }
+  .freq input {
+    width: 90px; font-family: var(--font-mono); font-size: 13px; text-align: right;
+    color: var(--amber); background: var(--bg); border: none; padding: 6px 9px; outline: none;
+  }
+  .freq .u { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); padding: 0 9px; background: var(--elevated); align-self: stretch; display: grid; place-items: center; }
+
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: .1em;
+    text-transform: uppercase; padding: 11px; border-radius: 3px; cursor: pointer;
+    border: 1px solid; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .btn-test { color: var(--amber); border-color: var(--amber-dim); background: color-mix(in srgb, var(--amber) 8%, transparent); }
+  .btn-test .dot { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .btn-test:hover { background: color-mix(in srgb, var(--amber) 16%, transparent); box-shadow: 0 0 22px -8px var(--amber-glow); }
+  .btn-batch { color: var(--text-dim); border-color: var(--line-bright); background: var(--elevated); }
+  .btn-batch:hover { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 40%, transparent); }
+  .console .status { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .console .status .ok { color: var(--green); }
+
+  /* ═══════════ 嗅探预览 ═══════════ */
+  .section-label { display: flex; align-items: center; gap: 12px; margin: 26px 0 14px; }
+  .section-label .t { font-family: var(--font-display); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-dim); }
+  .section-label .dash { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px); }
+
+  .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); border-radius: var(--radius); padding: 11px 13px; position: relative; overflow: hidden; }
+  .stat .k { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
+  .stat .v { font-family: var(--font-mono); font-weight: 600; font-size: 22px; margin-top: 3px; color: var(--text); }
+  .stat .u { font-family: var(--font-mono); font-size: 9px; color: var(--text-faint); }
+  .stat.live .v { color: var(--amber); text-shadow: 0 0 16px var(--amber-glow); }
+  .stat.tcp .v { color: var(--cyan); } .stat.udp .v { color: var(--green); } .stat.arp .v { color: var(--violet); }
+  .stat .spark { position: absolute; right: 0; bottom: 0; left: 0; height: 22px; opacity: .5; }
+
+  .pkts { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .pkts .ph { display: grid; grid-template-columns: 70px 64px 1.4fr 1.4fr 70px 1fr; gap: 0; background: var(--elevated); border-bottom: 1px solid var(--line-bright); }
+  .pkts .ph div { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); padding: 8px 12px; }
+  .prow { display: grid; grid-template-columns: 70px 64px 1.4fr 1.4fr 70px 1fr; gap: 0; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; cursor: pointer; transition: background .12s; }
+  .prow:hover { background: var(--panel-2); }
+  .prow > div { padding: 7px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prow .ts { color: var(--text-faint); }
+  .prow .proto-badge { }
+  .badge { font-family: var(--font-mono); font-size: 9px; font-weight: 600; padding: 1px 7px; border-radius: 2px; letter-spacing: .05em; }
+  .badge.tcp { color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); }
+  .badge.udp { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+  .badge.arp { color: var(--violet); background: color-mix(in srgb, var(--violet) 14%, transparent); }
+  .badge.icmp { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+  .prow .addr { color: var(--text); }
+  .prow .info { color: var(--text-dim); }
+
+  /* 底部状态条 */
+  .footer {
+    display: flex; align-items: center; gap: 18px; padding: 0 16px;
+    background: var(--panel); border-top: 1px solid var(--line);
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); letter-spacing: .04em;
+  }
+  .footer .seg { display: flex; align-items: center; gap: 6px; }
+  .footer .seg b { color: var(--text-dim); font-weight: 500; }
+  .footer .right { margin-left: auto; display: flex; gap: 18px; }
+  .footer .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  @keyframes bootin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .boot { animation: bootin .5s cubic-bezier(.2,.7,.2,1) backwards; }
+  .d1 { animation-delay: .05s } .d2 { animation-delay: .11s } .d3 { animation-delay: .17s }
+  .d4 { animation-delay: .23s } .d5 { animation-delay: .3s } .d6 { animation-delay: .38s }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══════ 状态栏 ══════ -->
+  <header class="statusbar boot">
+    <div class="brand">
+      <span class="mark">BIT<b>SENDER</b></span>
+      <span class="ver">v2.0 · TS</span>
+    </div>
+    <div class="nic" title="点击切换网卡">
+      <span class="led"></span>
+      <span class="name">en0</span>
+      <span class="sep">·</span>
+      <span class="ip">192.168.1.34</span>
+      <span class="sep">·</span>
+      <span class="ip">a4:83:e7:2c:18:9f</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="sb-right">
+      <button class="iconbtn on" title="深色">◐</button>
+      <button class="iconbtn" title="语言">文</button>
+      <button class="iconbtn" title="设置">⚙</button>
+    </div>
+  </header>
+
+  <!-- ══════ 工作区 ══════ -->
+  <div class="workspace">
+
+    <!-- icon rail -->
+    <nav class="rail boot d1">
+      <div class="r active" title="发包">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+        <span class="tip">报文编辑</span>
+      </div>
+      <div class="r" title="嗅探">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span class="tip">网口嗅探</span>
+      </div>
+      <div class="r" title="序列">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <span class="tip">序列发送</span>
+      </div>
+      <div class="r" title="模板">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span class="tip">模板库</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="r" title="配置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>
+        <span class="tip">配置管理</span>
+      </div>
+    </nav>
+
+    <!-- 主区：报文编辑器 -->
+    <main>
+      <div class="view-head boot d2">
+        <h1>Packet Forge</h1>
+        <span class="crumb">// 报文编辑 · 实时构建</span>
+        <span class="dash"></span>
+      </div>
+
+      <!-- 协议 tab -->
+      <div class="protos boot d2">
+        <button class="proto">ETH</button>
+        <button class="proto">ARP</button>
+        <button class="proto">IPv4</button>
+        <button class="proto active">TCP <span class="x">0x06</span></button>
+        <button class="proto">UDP</button>
+      </div>
+
+      <div class="editor">
+        <!-- 字段表单 -->
+        <div class="fieldgroups">
+          <!-- 以太网层 -->
+          <div class="group boot d3">
+            <header><span class="bar" style="background:var(--violet);box-shadow:0 0 8px rgba(139,125,255,.4)"></span><span class="tag" style="color:var(--violet)">Ethernet ll</span><span class="meta">14 bytes</span></header>
+            <div class="grid-fields">
+              <div class="field"><label>目的 MAC</label><input class="mac" value="ff:ff:ff:ff:ff:ff" /></div>
+              <div class="field auto"><label>源 MAC <span style="color:var(--cyan)">◆ 本机</span></label><input class="mac" value="a4:83:e7:2c:18:9f" /></div>
+              <div class="field"><label>类型</label><input class="num" value="0x0800" /></div>
+            </div>
+          </div>
+
+          <!-- IP 层 -->
+          <div class="group boot d4">
+            <header><span class="bar"></span><span class="tag">Internet Protocol v4</span><span class="meta">20 bytes · ✓ checksum</span></header>
+            <div class="grid-fields">
+              <div class="field auto"><label>源 IP <span style="color:var(--cyan)">◆ 本机</span></label><input class="ip" value="192.168.1.34" /></div>
+              <div class="field"><label>目的 IP</label><input class="ip" value="192.168.1.1" /></div>
+              <div class="field"><label>TTL</label><input class="num" value="64" /></div>
+              <div class="field"><label>协议</label><input class="num" value="6" /></div>
+            </div>
+          </div>
+
+          <!-- 传输层 -->
+          <div class="group boot d5">
+            <header><span class="bar" style="background:var(--amber);box-shadow:0 0 8px var(--amber-glow)"></span><span class="tag" style="color:var(--amber)">TCP Segment</span><span class="meta">20 bytes · ✓ pseudo-hdr checksum</span></header>
+            <div class="grid-fields three">
+              <div class="field"><label>源端口</label><input class="num" value="54321" /></div>
+              <div class="field"><label>目的端口</label><input class="num" value="80" /></div>
+              <div class="field"><label>序列号</label><input class="num" value="1000" /></div>
+              <div class="field"><label>确认号</label><input class="num" value="0" /></div>
+              <div class="field"><label>窗口</label><input class="num" value="8192" /></div>
+              <div class="field"><label>校验和</label><input class="num auto" value="auto" style="color:var(--cyan)" /></div>
+            </div>
+            <div style="display:flex;gap:6px;padding:10px 14px;flex-wrap:wrap;border-top:1px solid var(--line)">
+              <span style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;align-self:center;margin-right:4px">Flags</span>
+              <span class="flag on">SYN</span><span class="flag">ACK</span><span class="flag">PSH</span><span class="flag">RST</span><span class="flag">FIN</span><span class="flag">URG</span>
+            </div>
+          </div>
+
+          <!-- payload -->
+          <div class="group boot d6">
+            <header><span class="bar" style="background:var(--text-faint);box-shadow:none"></span><span class="tag" style="color:var(--text-dim)">Payload</span><span class="meta">hex / text</span></header>
+            <div class="payload"><textarea placeholder="48 65 6c 6c 6f 20 57 6f 72 6c 64   // 16 进制或文本">48 65 6c 6c 6f</textarea></div>
+          </div>
+        </div>
+
+        <!-- 示波器 + 控制台 -->
+        <div class="scope-wrap boot d4">
+          <div class="scope">
+            <header>
+              <span class="t">◈ PACKET SCOPE</span>
+              <span class="len">LEN <b>59</b> B</span>
+            </header>
+            <div class="hex">
+              <div class="hexrow">
+                <span class="off">0000</span>
+                <span class="bytes"><span class="b eth">ff ff ff ff ff ff </span><span class="b eth">a4 83</span></span>
+                <span class="ascii">······¤?</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0008</span>
+                <span class="bytes"><span class="b eth">e7 2c 18 9f </span><span class="b eth">08 00 </span><span class="b ip">45 00</span></span>
+                <span class="ascii">?,······E·</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0010</span>
+                <span class="bytes"><span class="b ip">00 2d 00 00 40 00 40 06</span></span>
+                <span class="ascii">·-··@·@·</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0018</span>
+                <span class="bytes"><span class="b ip">b8 5f c0 a8 01 22 c0 a8</span></span>
+                <span class="ascii">¸_À¨·"À¨</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0020</span>
+                <span class="bytes"><span class="b ip">01 01 </span><span class="b l4">d4 31 00 50 00 00</span></span>
+                <span class="ascii">··Ô1·P··</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0028</span>
+                <span class="bytes"><span class="b l4">03 e8 00 00 00 00 50 02</span></span>
+                <span class="ascii">·è····P·</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0030</span>
+                <span class="bytes"><span class="b l4">20 00 8f 2c 00 00 </span><span class="b pad">48 65</span></span>
+                <span class="ascii"> ··,··He</span>
+              </div>
+              <div class="hexrow">
+                <span class="off">0038</span>
+                <span class="bytes"><span class="b pad">6c 6c 6f</span></span>
+                <span class="ascii">llo</span>
+              </div>
+            </div>
+            <div class="legend">
+              <span><i style="background:var(--violet)"></i>Ethernet</span>
+              <span><i style="background:var(--cyan)"></i>IPv4</span>
+              <span><i style="background:var(--amber)"></i>TCP</span>
+              <span><i style="background:var(--text-faint)"></i>Payload</span>
+            </div>
+          </div>
+
+          <div class="console">
+            <div class="row">
+              <label>发送频率</label>
+              <div class="freq"><input value="1000" /><span class="u">pkt/s</span></div>
+            </div>
+            <div class="btns">
+              <button class="btn btn-test"><span class="dot"></span>Test Send</button>
+              <button class="btn btn-batch">Batch ▸</button>
+            </div>
+            <div class="status"><span class="ok">●</span> READY · 上次测试发送成功 · 59 bytes via en0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ 嗅探预览（同屏向下展示第二界面） ══════ -->
+      <div class="section-label boot d6"><span class="t">◈ Live Capture · 网口嗅探</span><span class="dash"></span></div>
+
+      <div class="stats boot d6">
+        <div class="stat live"><div class="k">PKT / SEC</div><div class="v">12,847</div><div class="u">实时速率 · 滑窗 1s</div></div>
+        <div class="stat"><div class="k">Total</div><div class="v">1.84<span style="font-size:13px">M</span></div><div class="u">全量真值</div></div>
+        <div class="stat tcp"><div class="k">TCP</div><div class="v">9,210</div><div class="u">/s</div></div>
+        <div class="stat udp"><div class="k">UDP</div><div class="v">3,102</div><div class="u">/s</div></div>
+        <div class="stat arp"><div class="k">ARP</div><div class="v">535</div><div class="u">/s</div></div>
+      </div>
+
+      <div class="pkts boot d6">
+        <div class="ph"><div>Time</div><div>Proto</div><div>Source</div><div>Destination</div><div>Len</div><div>Info</div></div>
+        <div class="prow"><div class="ts">14:22:01.337</div><div><span class="badge tcp">TCP</span></div><div class="addr">192.168.1.34:54321</div><div class="addr">192.168.1.1:80</div><div>74</div><div class="info">[SYN] Seq=1000 Win=8192</div></div>
+        <div class="prow"><div class="ts">14:22:01.338</div><div><span class="badge tcp">TCP</span></div><div class="addr">192.168.1.1:80</div><div class="addr">192.168.1.34:54321</div><div>74</div><div class="info">[SYN,ACK] Seq=0 Ack=1001</div></div>
+        <div class="prow"><div class="ts">14:22:01.501</div><div><span class="badge udp">UDP</span></div><div class="addr">192.168.1.34:51820</div><div class="addr">8.8.8.8:53</div><div>86</div><div class="info">Standard query A example.com</div></div>
+        <div class="prow"><div class="ts">14:22:01.622</div><div><span class="badge arp">ARP</span></div><div class="addr">a4:83:e7:2c:18:9f</div><div class="addr">ff:ff:ff:ff:ff:ff</div><div>60</div><div class="info">Who has 192.168.1.1? Tell .34</div></div>
+        <div class="prow"><div class="ts">14:22:01.745</div><div><span class="badge icmp">ICMP</span></div><div class="addr">192.168.1.34</div><div class="addr">192.168.1.1</div><div>98</div><div class="info">Echo (ping) request id=0x12</div></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 底部状态条 -->
+  <footer class="footer boot d6">
+    <span class="seg live-dot-wrap"><span class="live-dot"></span><b>CAPTURING</b></span>
+    <span class="seg">IFACE <b>en0</b></span>
+    <span class="seg">DRIVER <b>libpcap 1.10</b></span>
+    <span class="seg">PROTO <b>TCP / 0x06</b></span>
+    <div class="right">
+      <span class="seg">SENT <b>59 B</b></span>
+      <span class="seg">⏱ <b>00:14:22</b></span>
+      <span class="seg">© BitSender</span>
+    </div>
+  </footer>
+</div>
+
+<style>
+  .flag { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--text-faint); border: 1px solid var(--line-bright); padding: 3px 9px; border-radius: 3px; cursor: pointer; transition: all .15s; }
+  .flag:hover { color: var(--text-dim); border-color: var(--text-faint); }
+  .flag.on { color: var(--amber); border-color: var(--amber-dim); background: color-mix(in srgb, var(--amber) 12%, transparent); box-shadow: 0 0 12px -4px var(--amber-glow); }
+</style>
+</body>
+</html>
