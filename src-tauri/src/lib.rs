@@ -819,6 +819,8 @@ pub fn run() {
         .manage(SnifferState::new(Mutex::new(SnifferManager::new())))
         .manage(MonitorState::new(Mutex::new(MonitorManager::new())))
         .manage(InterfaceManagerState::new(Mutex::new(InterfaceManager::new().expect("无法初始化接口管理器"))))
+        .manage(std::sync::Arc::new(v2::sender::BatchRegistry::default()))
+        .manage(std::sync::Arc::new(v2::capture::CaptureState::default()))
         .invoke_handler(tauri::generate_handler![
             greet,
             build_packet_preview,
@@ -844,7 +846,14 @@ pub fn run() {
             get_test_results,
             v2::commands::build_packet_preview_v2,
             v2::commands::list_interfaces_v2,
-            v2::commands::send_packet_v2
+            v2::commands::send_packet_v2,
+            v2::commands::start_batch_send_v2,
+            v2::commands::get_batch_status_v2,
+            v2::commands::stop_batch_send_v2,
+            v2::commands::start_capture_v2,
+            v2::commands::stop_capture_v2,
+            v2::commands::get_capture_stats_v2,
+            v2::commands::get_captured_packets_v2
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -860,7 +869,14 @@ mod specta_export {
             .commands(tauri_specta::collect_commands![
                 crate::v2::commands::build_packet_preview_v2,
                 crate::v2::commands::list_interfaces_v2,
-                crate::v2::commands::send_packet_v2
+                crate::v2::commands::send_packet_v2,
+                crate::v2::commands::start_batch_send_v2,
+                crate::v2::commands::get_batch_status_v2,
+                crate::v2::commands::stop_batch_send_v2,
+                crate::v2::commands::start_capture_v2,
+                crate::v2::commands::stop_capture_v2,
+                crate::v2::commands::get_capture_stats_v2,
+                crate::v2::commands::get_captured_packets_v2
             ]);
         builder
             .export(

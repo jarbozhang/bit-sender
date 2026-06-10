@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NetworkProvider, useNetwork } from "./contexts/network";
 import { PacketEditor } from "./features/packet-editor/PacketEditor";
+import { SnifferView } from "./features/sniffer/SnifferView";
 
 type ViewId = "editor" | "sniffer" | "sequence" | "templates" | "config";
 
@@ -94,7 +95,13 @@ function Shell() {
         </nav>
 
         <main className="min-w-0 overflow-y-auto px-[22px] py-[18px]">
-          {view === "editor" ? <PacketEditor /> : <Placeholder name={RAIL.find((r) => r.id === view)!.label} />}
+          {view === "editor" ? (
+            <PacketEditor />
+          ) : view === "sniffer" ? (
+            <SnifferView />
+          ) : (
+            <Placeholder name={RAIL.find((r) => r.id === view)!.label} />
+          )}
         </main>
       </div>
 

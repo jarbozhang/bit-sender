@@ -43,6 +43,64 @@ async sendPacketV2(spec: PacketSpec, interfaceName: string) : Promise<Result<Sen
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * 启动批量发送（v2）。stop_condition: "manual"|"duration"|"count"，stop_value 为秒数或包数。
+ */
+async startBatchSendV2(spec: PacketSpec, interfaceName: string, frequency: number, stopCondition: string, stopValue: number) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_batch_send_v2", { spec, interfaceName, frequency, stopCondition, stopValue }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 查询批量任务状态。
+ */
+async getBatchStatusV2(taskId: string) : Promise<BatchStatus | null> {
+    return await TAURI_INVOKE("get_batch_status_v2", { taskId });
+},
+/**
+ * 停止批量任务。
+ */
+async stopBatchSendV2(taskId: string) : Promise<boolean> {
+    return await TAURI_INVOKE("stop_batch_send_v2", { taskId });
+},
+/**
+ * 启动网口嗅探（v2）。启动即验证网卡可打开，失败 Err；幂等：已在跑先停。
+ * 统计经 `capture://stats` event 每 250ms 主动推送，包列表用 `get_captured_packets_v2` 拉取。
+ */
+async startCaptureV2(interfaceName: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_capture_v2", { interfaceName }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 停止网口嗅探（v2）。
+ */
+async stopCaptureV2() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_capture_v2") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 查询当前捕获统计快照（v2）。无捕获时返回零值快照。
+ */
+async getCaptureStatsV2() : Promise<CaptureStats | null> {
+    return await TAURI_INVOKE("get_capture_stats_v2");
+},
+/**
+ * 拉取最新捕获的包（v2，最新在前）。默认 100。
+ */
+async getCapturedPacketsV2(maxCount: number | null) : Promise<CapturedPacket[]> {
+    return await TAURI_INVOKE("get_captured_packets_v2", { maxCount });
 }
 }
 
@@ -61,6 +119,31 @@ async sendPacketV2(spec: PacketSpec, interfaceName: string) : Promise<Result<Sen
  * 注意：以太网层 src/dst MAC 与 ARP 层 sender/target MAC 分开建模——二者可不同。
  */
 export type ArpSpec = { dst_mac: string; src_mac: string; hw_type: number; proto_type: number; hw_size: number; proto_size: number; opcode: number; sender_mac: string; sender_ip: string; target_mac: string; target_ip: string; payload_hex: string }
+export type BatchStatus = { task_id: string; start_time: number; sent_count: number; target_speed: number; running: boolean; completed: boolean }
+/**
+ * 捕获统计（真值，全量累计 + 实时速率）。经 event 推送给前端。
+ */
+export type CaptureStats = { total_packets: number; total_bytes: number; 
+/**
+ * 实时包速率（最近一个完整秒桶的包数）。
+ */
+pps: number; 
+/**
+ * 实时字节速率（最近一个完整秒桶的字节数）。
+ */
+bps: number; tcp: number; udp: number; arp: number; icmp: number; other: number; 
+/**
+ * 因包列表缓冲满被丢弃的包数（不影响统计真值，仅影响前端可见列表）。
+ */
+dropped_for_display: number }
+/**
+ * 单个解析后的包，供前端列表展示。
+ */
+export type CapturedPacket = { id: string; 
+/**
+ * 包头时间戳（毫秒，UNIX epoch）。来自 pcap `header.ts`，非本地时钟。
+ */
+timestamp_ms: number; protocol: string; src_mac: string; dst_mac: string; src_ip: string | null; dst_ip: string | null; src_port: number | null; dst_port: number | null; size: number; info: string }
 /**
  * 以太网帧规格。字段命名为单一事实来源，经 specta 自动生成同名 TS 类型。
  */

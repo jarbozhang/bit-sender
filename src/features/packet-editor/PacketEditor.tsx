@@ -12,6 +12,7 @@ import {
 } from "../../lib/protocols";
 import { toHexRows, byteLength } from "../../lib/hexdump";
 import { useNetwork } from "../../contexts/network";
+import { BatchDialog } from "./BatchDialog";
 
 type SendMsg = { kind: "ok" | "err" | "idle"; text: string };
 
@@ -23,6 +24,7 @@ export function PacketEditor() {
   const [previewErr, setPreviewErr] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState<SendMsg>({ kind: "idle", text: "READY · 填写字段后测试发送" });
+  const [showBatch, setShowBatch] = useState(false);
 
   const def = getProto(proto);
   const set = (k: string, v: string | boolean) => setValues((prev) => ({ ...prev, [k]: v }));
@@ -196,9 +198,8 @@ export function PacketEditor() {
                 {sending ? "发送中…" : "Test Send"}
               </button>
               <button
-                disabled
-                title="批量发送将在 M3 实装"
-                className="font-display font-semibold text-xs tracking-[0.1em] uppercase py-2.5 rounded border border-line-bright text-faint bg-elevated cursor-not-allowed"
+                onClick={() => (selected ? setShowBatch(true) : setSendMsg({ kind: "err", text: "请先在顶部状态栏选择网卡" }))}
+                className="font-display font-semibold text-xs tracking-[0.1em] uppercase py-2.5 rounded border border-line-bright text-dim bg-elevated hover:text-cyan hover:border-cyan/40 transition"
               >
                 Batch ▸
               </button>
@@ -210,6 +211,13 @@ export function PacketEditor() {
           </div>
         </div>
       </div>
+
+      <BatchDialog
+        visible={showBatch}
+        onClose={() => setShowBatch(false)}
+        spec={buildSpec(proto, values)}
+        interfaceName={selected?.name ?? null}
+      />
     </div>
   );
 }

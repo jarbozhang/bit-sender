@@ -4,9 +4,11 @@
 //! 顶层 `PacketSpec` 派发枚举 + `build_packet_preview` 命令。
 //! 后续里程碑会在此填入 sender / capture / monitor。
 
+pub mod capture;
 pub mod commands;
 pub mod net;
 pub mod protocol;
+pub mod sender;
 
 pub use commands::build_packet_preview_v2;
 pub use protocol::PacketSpec;
