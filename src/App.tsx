@@ -7,6 +7,7 @@ import { SnifferView } from "./features/sniffer/SnifferView";
 import { TemplateLibrary } from "./features/templates/TemplateLibrary";
 import { SequenceView } from "./features/sequence/SequenceView";
 import { MonitorView } from "./features/monitor/MonitorView";
+import { ConfigView } from "./features/config/ConfigView";
 
 type ViewId = "editor" | "sniffer" | "sequence" | "monitor" | "templates" | "config";
 
@@ -18,16 +19,6 @@ const RAIL: { id: ViewId; labelKey: string; path: string }[] = [
   { id: "templates", labelKey: "nav.templates", path: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" },
   { id: "config", labelKey: "nav.config", path: "M12 9a3 3 0 100 6 3 3 0 000-6zM12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2" },
 ];
-
-function Placeholder({ labelKey }: { labelKey: string }) {
-  const { t } = useI18n();
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-faint gap-3">
-      <div className="font-display text-sm tracking-[0.2em]">{t(labelKey).toUpperCase()}</div>
-      <div className="font-mono text-xs">// {t("placeholder.soon")}</div>
-    </div>
-  );
-}
 
 function NicPicker() {
   const { interfaces, selected, setSelected } = useNetwork();
@@ -121,7 +112,7 @@ function Shell() {
           ) : view === "monitor" ? (
             <MonitorView />
           ) : (
-            <Placeholder labelKey={RAIL.find((r) => r.id === view)!.labelKey} />
+            <ConfigView />
           )}
         </main>
       </div>
