@@ -3,6 +3,7 @@ import { useEditor } from "../../contexts/editor";
 import { getProto, buildSpec, type ProtoKey } from "../../lib/protocols";
 import { api, type SequenceStep } from "../../lib/api";
 import { useNetwork } from "../../contexts/network";
+import { useI18n } from "../../contexts/i18n";
 
 export interface SeqItem {
   id: string;
@@ -18,15 +19,16 @@ let seqCounter = 0;
 export function SequenceView() {
   const { proto, values } = useEditor();
   const { selected } = useNetwork();
+  const { t } = useI18n();
   const [seq, setSeq] = useState<SeqItem[]>([]);
   const [loopCount, setLoopCount] = useState(1);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "idle"; text: string }>({ kind: "idle", text: "READY" });
+  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "idle"; text: string }>({ kind: "idle", text: t("footer.ready") });
 
   const addCurrent = () => {
     seqCounter += 1;
     setSeq((s) => [
       ...s,
-      { id: `seq-${seqCounter}`, name: `${getProto(proto).label} 包 ${s.length + 1}`, proto, values: { ...values }, delayMs: 100, enabled: true },
+      { id: `seq-${seqCounter}`, name: t("sequence.pktName", { proto: getProto(proto).label, n: s.length + 1 }), proto, values: { ...values }, delayMs: 100, enabled: true },
     ]);
   };
   const remove = (id: string) => setSeq((s) => s.filter((p) => p.id !== id));
@@ -46,7 +48,7 @@ export function SequenceView() {
 
   const start = async () => {
     if (!selected) {
-      setMsg({ kind: "err", text: "请先选择网卡" });
+      setMsg({ kind: "err", text: t("common.selectNicFirst") });
       return;
     }
     try {
@@ -55,7 +57,7 @@ export function SequenceView() {
         delay_ms: p.delayMs,
       }));
       const id = await api.startSequence(steps, selected.name, loopCount);
-      setMsg({ kind: "ok", text: `序列已启动 · 任务 ${id.slice(0, 8)}` });
+      setMsg({ kind: "ok", text: t("sequence.started", { id: id.slice(0, 8) }) });
     } catch (e) {
       setMsg({ kind: "err", text: String(e) });
     }
@@ -64,23 +66,23 @@ export function SequenceView() {
   return (
     <div className="boot">
       <div className="flex items-center gap-3 mb-4">
-        <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">Packet Sequence</h1>
-        <span className="font-mono text-[11px] text-faint tracking-wide">// 序列发送 · 按序定时</span>
+        <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">{t("sequence.title")}</h1>
+        <span className="font-mono text-[11px] text-faint tracking-wide">{t("sequence.subtitle")}</span>
         <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,#1b2a33 0 6px,transparent 6px 12px)" }} />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={addCurrent} className="font-display text-xs uppercase tracking-wide px-3.5 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 transition">+ 添加当前包</button>
+        <button onClick={addCurrent} className="font-display text-xs uppercase tracking-wide px-3.5 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 transition">{t("sequence.addCurrent")}</button>
         <div className="flex items-center gap-2 ml-auto">
-          <span className="font-mono text-[11px] text-dim">循环</span>
+          <span className="font-mono text-[11px] text-dim">{t("sequence.loop")}</span>
           <input type="number" min={1} value={loopCount} onChange={(e) => setLoopCount(Math.max(1, Number(e.target.value)))} className="w-20 font-mono text-[12px] text-amber bg-bg border border-line-bright rounded px-2 py-1.5 outline-none focus:border-amber" />
-          <span className="font-mono text-[11px] text-dim">次</span>
+          <span className="font-mono text-[11px] text-dim">{t("sequence.loopUnit")}</span>
         </div>
       </div>
 
       {seq.length === 0 ? (
         <div className="border border-line rounded py-12 text-center font-mono text-xs text-faint">
-          序列为空 · 在编辑器配置好报文后点「添加当前包」
+          {t("sequence.empty")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -105,10 +107,10 @@ export function SequenceView() {
       )}
 
       <div className="flex items-center gap-3 mt-4 pt-4 border-t border-line">
-        <span className="font-mono text-[11px] text-dim">共 {seq.length} 包 · 启用 {enabled.length}</span>
+        <span className="font-mono text-[11px] text-dim">{t("sequence.summary", { total: seq.length, enabled: enabled.length })}</span>
         <span className={`font-mono text-[11px] ml-auto ${msg.kind === "ok" ? "text-signalgreen" : msg.kind === "err" ? "text-signalred" : "text-faint"}`}>{msg.text}</span>
         <button onClick={start} disabled={enabled.length === 0} className="font-display text-xs uppercase tracking-wide px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber disabled:opacity-40 transition">
-          ▶ 开始序列
+          {t("sequence.start")}
         </button>
       </div>
     </div>

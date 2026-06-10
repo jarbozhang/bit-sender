@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { api, type PacketSpec, type BatchStatus } from "../../lib/api";
+import { useI18n } from "../../contexts/i18n";
 
 type Phase = "setup" | "running" | "done";
 type StopCondition = "manual" | "duration" | "count";
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
+  const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>("setup");
   const [frequency, setFrequency] = useState(1000);
   const [stopCondition, setStopCondition] = useState<StopCondition>("manual");
@@ -42,7 +44,7 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
 
   const start = async () => {
     if (!interfaceName) {
-      setError("请先选择网卡");
+      setError(t("common.selectNicFirst"));
       return;
     }
     setError(null);
@@ -81,9 +83,9 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
       <div className="bg-gradient-to-b from-panel-2 to-panel border border-line-bright rounded w-[440px] p-5 shadow-2xl">
         <div className="flex items-center gap-2.5 mb-4">
           <span className="font-display text-sm tracking-[0.16em] text-amber" style={{ textShadow: "0 0 12px rgba(255,178,36,.4)" }}>
-            ◈ BATCH SEND
+            {t("batch.title")}
           </span>
-          <span className="font-mono text-[10px] text-faint ml-auto">{interfaceName ?? "未选网卡"}</span>
+          <span className="font-mono text-[10px] text-faint ml-auto">{interfaceName ?? t("batch.noNic")}</span>
         </div>
 
         {error && <div className="mb-3 font-mono text-[11px] text-signalred">✕ {error}</div>}
@@ -91,7 +93,7 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
         {phase === "setup" && (
           <div className="space-y-3.5">
             <div>
-              <label className="block text-[10px] uppercase tracking-wide text-dim mb-1.5">发送频率</label>
+              <label className="block text-[10px] uppercase tracking-wide text-dim mb-1.5">{t("batch.frequency")}</label>
               <div className="flex items-center border border-line-bright rounded overflow-hidden">
                 <input
                   type="number"
@@ -104,7 +106,7 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
               </div>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wide text-dim mb-1.5">终止条件</label>
+              <label className="block text-[10px] uppercase tracking-wide text-dim mb-1.5">{t("batch.stopCondition")}</label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(["manual", "duration", "count"] as StopCondition[]).map((c) => (
                   <button
@@ -112,7 +114,7 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
                     onClick={() => setStopCondition(c)}
                     className={`font-mono text-[11px] py-1.5 rounded border transition ${stopCondition === c ? "text-amber border-amber-dim bg-amber/10" : "text-dim border-line-bright hover:text-txt"}`}
                   >
-                    {c === "manual" ? "手动" : c === "duration" ? "时长(s)" : "数量"}
+                    {c === "manual" ? t("batch.manual") : c === "duration" ? t("batch.duration") : t("batch.count")}
                   </button>
                 ))}
               </div>
@@ -120,7 +122,7 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
             {stopCondition !== "manual" && (
               <div>
                 <label className="block text-[10px] uppercase tracking-wide text-dim mb-1.5">
-                  {stopCondition === "duration" ? "发送时长（秒）" : "发送数量（包）"}
+                  {stopCondition === "duration" ? t("batch.durationLabel") : t("batch.countLabel")}
                 </label>
                 <input
                   type="number"
@@ -132,17 +134,17 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
               </div>
             )}
             <div className="flex justify-end gap-2 pt-1">
-              <button onClick={onClose} className="font-ui text-xs px-4 py-2 rounded border border-line-bright text-dim hover:text-txt">取消</button>
-              <button onClick={start} className="font-display text-xs tracking-wide uppercase px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber transition">开始发送</button>
+              <button onClick={onClose} className="font-ui text-xs px-4 py-2 rounded border border-line-bright text-dim hover:text-txt">{t("common.cancel")}</button>
+              <button onClick={start} className="font-display text-xs tracking-wide uppercase px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber transition">{t("batch.startSend")}</button>
             </div>
           </div>
         )}
 
         {(phase === "running" || phase === "done") && (
           <div className="space-y-3 font-mono text-[12px]">
-            <div className="flex justify-between"><span className="text-dim">状态</span><span className={phase === "running" ? "text-amber" : "text-signalgreen"}>{phase === "running" ? "⚡ 发送中" : "✓ 已结束"}</span></div>
-            <div className="flex justify-between"><span className="text-dim">已发送</span><span className="text-cyan font-semibold">{(status?.sent_count ?? 0).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-dim">目标速率</span><span className="text-txt">{(status?.target_speed ?? frequency).toLocaleString()} pkt/s</span></div>
+            <div className="flex justify-between"><span className="text-dim">{t("batch.status")}</span><span className={phase === "running" ? "text-amber" : "text-signalgreen"}>{phase === "running" ? t("batch.running") : t("batch.done")}</span></div>
+            <div className="flex justify-between"><span className="text-dim">{t("batch.sentCount")}</span><span className="text-cyan font-semibold">{(status?.sent_count ?? 0).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-dim">{t("batch.targetSpeed")}</span><span className="text-txt">{(status?.target_speed ?? frequency).toLocaleString()} pkt/s</span></div>
             {progressPct !== null && (
               <div className="w-full bg-elevated rounded-full h-1.5 overflow-hidden">
                 <div className="bg-amber h-full transition-all" style={{ width: `${progressPct}%`, boxShadow: "0 0 8px rgba(255,178,36,.5)" }} />
@@ -150,9 +152,9 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
             )}
             <div className="flex justify-end gap-2 pt-2">
               {phase === "running" ? (
-                <button onClick={stop} className="font-display text-xs tracking-wide uppercase px-4 py-2 rounded border border-signalred/50 text-signalred bg-signalred/10 hover:bg-signalred/20 transition">停止</button>
+                <button onClick={stop} className="font-display text-xs tracking-wide uppercase px-4 py-2 rounded border border-signalred/50 text-signalred bg-signalred/10 hover:bg-signalred/20 transition">{t("common.stop")}</button>
               ) : (
-                <button onClick={onClose} className="font-ui text-xs px-4 py-2 rounded border border-line-bright text-dim hover:text-txt">关闭</button>
+                <button onClick={onClose} className="font-ui text-xs px-4 py-2 rounded border border-line-bright text-dim hover:text-txt">{t("common.close")}</button>
               )}
             </div>
           </div>

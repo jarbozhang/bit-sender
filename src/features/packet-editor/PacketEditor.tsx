@@ -14,16 +14,18 @@ import { toHexRows, byteLength } from "../../lib/hexdump";
 import { useNetwork } from "../../contexts/network";
 import { useEditor } from "../../contexts/editor";
 import { BatchDialog } from "./BatchDialog";
+import { useI18n } from "../../contexts/i18n";
 
 type SendMsg = { kind: "ok" | "err" | "idle"; text: string };
 
 export function PacketEditor() {
   const { selected } = useNetwork();
   const { proto, values, setProto, setValue } = useEditor();
+  const { t } = useI18n();
   const [previewHex, setPreviewHex] = useState("");
   const [previewErr, setPreviewErr] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [sendMsg, setSendMsg] = useState<SendMsg>({ kind: "idle", text: "READY · 填写字段后测试发送" });
+  const [sendMsg, setSendMsg] = useState<SendMsg>({ kind: "idle", text: "" });
   const [showBatch, setShowBatch] = useState(false);
 
   const def = getProto(proto);
@@ -66,13 +68,13 @@ export function PacketEditor() {
 
   const onSend = async () => {
     if (!selected) {
-      setSendMsg({ kind: "err", text: "请先在顶部状态栏选择网卡" });
+      setSendMsg({ kind: "err", text: t("common.selectNicFirst") });
       return;
     }
     setSending(true);
     try {
       const r = await api.sendPacket(buildSpec(proto, values), selected.name);
-      setSendMsg({ kind: "ok", text: `已发送 ${r.bytes} 字节 · via ${r.interface}` });
+      setSendMsg({ kind: "ok", text: t("editor.sent", { bytes: r.bytes, iface: r.interface }) });
     } catch (e) {
       setSendMsg({ kind: "err", text: String(e) });
     } finally {
@@ -86,8 +88,8 @@ export function PacketEditor() {
     <div className="boot">
       {/* 视图标题 */}
       <div className="flex items-center gap-3 mb-4">
-        <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">Packet Forge</h1>
-        <span className="font-mono text-[11px] text-faint tracking-wide">// 报文编辑 · 实时构建</span>
+        <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">{t("editor.title")}</h1>
+        <span className="font-mono text-[11px] text-faint tracking-wide">{t("editor.subtitle")}</span>
         <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,#1b2a33 0 6px,transparent 6px 12px)" }} />
       </div>
 
@@ -122,7 +124,7 @@ export function PacketEditor() {
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-line">
                     {normal.map((f) => (
                       <div key={f.key} className="bg-panel px-3.5 py-2.5 flex flex-col gap-1">
-                        <label className="text-[10px] tracking-wide uppercase text-dim">{f.label}</label>
+                        <label className="text-[10px] tracking-wide uppercase text-dim">{t(`field.${f.key}`)}</label>
                         <input
                           value={String(values[f.key] ?? "")}
                           onChange={(e) => setValue(f.key, e.target.value)}
@@ -136,7 +138,7 @@ export function PacketEditor() {
                 )}
                 {flags.length > 0 && (
                   <div className="flex gap-1.5 flex-wrap px-3.5 py-2.5 border-t border-line">
-                    <span className="text-[10px] text-dim uppercase tracking-wide self-center mr-1">Flags</span>
+                    <span className="text-[10px] text-dim uppercase tracking-wide self-center mr-1">{t("editor.flags")}</span>
                     {flags.map((f) => {
                       const on = Boolean(values[f.key]);
                       return (
@@ -160,14 +162,14 @@ export function PacketEditor() {
         <div className="flex flex-col gap-3.5 xl:sticky xl:top-0">
           <div className="scanlines border border-line-bright rounded overflow-hidden" style={{ background: "linear-gradient(180deg,#08110f,#060c0c)", boxShadow: "inset 0 0 60px -20px rgba(54,224,207,.18)" }}>
             <header className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line relative z-10">
-              <span className="font-display text-[11px] tracking-[0.16em] text-cyan" style={{ textShadow: "0 0 10px rgba(54,224,207,.35)" }}>◈ PACKET SCOPE</span>
-              <span className="ml-auto font-mono text-[10px] text-dim">LEN <b className="text-cyan">{byteLength(previewHex)}</b> B</span>
+              <span className="font-display text-[11px] tracking-[0.16em] text-cyan" style={{ textShadow: "0 0 10px rgba(54,224,207,.35)" }}>{t("editor.scope")}</span>
+              <span className="ml-auto font-mono text-[10px] text-dim">{t("editor.scopeLen")} <b className="text-cyan">{byteLength(previewHex)}</b> B</span>
             </header>
             <div className="relative z-10 px-3.5 py-3 font-mono text-[12px] leading-[1.85] min-h-[160px]">
               {previewErr ? (
                 <div className="text-signalred text-[11px]">⚠ {previewErr}</div>
               ) : rows.length === 0 ? (
-                <div className="text-faint text-[11px]">填写字段以构建报文…</div>
+                <div className="text-faint text-[11px]">{t("editor.scopeEmpty")}</div>
               ) : (
                 rows.map((r) => (
                   <div key={r.offset} className="grid grid-cols-[42px_1fr_130px] gap-3.5">
@@ -189,18 +191,18 @@ export function PacketEditor() {
                 className="font-display font-semibold text-xs tracking-[0.1em] uppercase py-2.5 rounded border border-amber-dim text-amber bg-amber/[0.08] hover:bg-amber/[0.16] hover:shadow-glow-amber transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-amber" style={{ boxShadow: "0 0 8px #ffb224" }} />
-                {sending ? "发送中…" : "Test Send"}
+                {sending ? t("editor.sending") : t("editor.testSend")}
               </button>
               <button
-                onClick={() => (selected ? setShowBatch(true) : setSendMsg({ kind: "err", text: "请先在顶部状态栏选择网卡" }))}
+                onClick={() => (selected ? setShowBatch(true) : setSendMsg({ kind: "err", text: t("common.selectNicFirst") }))}
                 className="font-display font-semibold text-xs tracking-[0.1em] uppercase py-2.5 rounded border border-line-bright text-dim bg-elevated hover:text-cyan hover:border-cyan/40 transition"
               >
-                Batch ▸
+                {t("editor.batch")} ▸
               </button>
             </div>
             <div className={`mt-3 pt-3 border-t border-line font-mono text-[11px] flex items-center gap-2 ${sendMsg.kind === "ok" ? "text-signalgreen" : sendMsg.kind === "err" ? "text-signalred" : "text-dim"}`}>
               <span>{sendMsg.kind === "ok" ? "●" : sendMsg.kind === "err" ? "✕" : "○"}</span>
-              <span className="truncate">{sendMsg.text}</span>
+              <span className="truncate">{sendMsg.kind === "idle" ? t("editor.ready") : sendMsg.text}</span>
             </div>
           </div>
         </div>

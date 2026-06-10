@@ -1,73 +1,63 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to Codex (and other coding agents) when working with code in this repository. It mirrors CLAUDE.md (which is gitignored).
 
 ## Project Overview
 
-BitSender（比达发包器）— a cross-platform network packet crafting/sending/capturing tool built with **Tauri 2 + React 18**. Supports Ethernet, ARP, IPv4, TCP, UDP, ICMP protocols.
+BitSender（比达发包器）— cross-platform network packet crafting/sending/capturing tool, **Tauri 2 + React 18 + TypeScript**. Raw L2 frames are built in Rust and sent via libpcap (Npcap on Windows).
+
+**The `rewrite/v2` branch is a full ground-up rewrite** (this file describes v2). v1 was deleted in M8; `main` may still hold v1 until v2 merges.
 
 ## Commands
 
 ```bash
-pnpm install              # Install dependencies
-pnpm tauri dev             # Full dev mode (Vite + Tauri, requires Rust toolchain)
-pnpm dev                   # Frontend only, port 1420
-pnpm tauri build           # Production build → src-tauri/target/release/bundle/
-
-# Rust tests
-cd src-tauri && cargo test
-
-# Release (syncs version across package.json, Cargo.toml, tauri.conf.json)
-pnpm release               # auto-increment minor
-pnpm release:patch         # increment patch
-./scripts/release.sh 1.2.3 # specific version
+pnpm install               # pnpm 11+; esbuild build is allowed via pnpm-workspace.yaml
+pnpm tauri dev             # full dev (Vite + Tauri; needs Rust + sudo for pcap send)
+pnpm dev                   # frontend only, port 1420 (strictPort)
+pnpm tauri build           # release bundle → src-tauri/target/release/bundle/
+pnpm typecheck             # tsc --noEmit (v2 is TypeScript)
+pnpm test                  # vitest (frontend unit tests)
+cd src-tauri && cargo test # Rust tests; regenerates src/api/bindings.ts via the specta_export test
+cd src-tauri && cargo clippy --all-targets -- -D warnings
 ```
 
 ## Architecture
 
+### Type-safe contract (the core idea)
+Rust defines a strongly-typed `PacketSpec` (enum with serde `tag = "kind"`). `tauri-specta` exports it + every command into `src/api/bindings.ts` during `cargo test` (the `specta_export` test in `lib.rs`). The frontend consumes the generated types, so a field/type mismatch fails at **TS compile time** — this root-fixes v1's "field contract by luck" (which used `HashMap<String,String>` + silent defaults). All v2 commands carry a `_v2` suffix.
+
+### Backend (`src-tauri/src/v2/`)
+- `protocol/` — one file per protocol (ethernet/arp/ipv4/ipv6/tcp/udp/icmp): each a strongly-typed `*Spec` + builder + golden byte tests. `mod.rs` holds the `PacketSpec` enum + dispatch + shared parse/checksum. Real IP / TCP-UDP-pseudo / ICMP checksums (RFC 1071/768).
+- `net.rs` — pcap device enumeration + `PacketSender`.
+- `sender.rs` — batch engine (atomic pre-claim → exact count, startup error surfacing, self-cleanup, no NIC isolation).
+- `capture.rs` — sniffer: capture thread is the sole truth source, pcap **header** timestamps, sliding-window pps over the last *complete* second, `capture://stats` event every 250ms, bounded buffer with `dropped_for_display`.
+- `monitor.rs` — response monitor: backend sends ICMP/ARP probes and matches replies via its own pcap; RTT = send/recv `Instant` diff.
+- `sequence.rs` — ordered timed send + loop (prebuilds & validates all frames upfront).
+- `commands.rs` — all `#[tauri::command] #[specta::specta]` v2 commands.
+- `lib.rs` — registers v2 commands, manages `Arc<…>` state, holds the `specta_export` test.
+
 ### Frontend (`src/`)
-- React 18 with JSX, functional components + hooks, no TypeScript
-- Tailwind CSS 3 for styling (dark mode via `dark:` variants)
-- Vite 6 bundler, pnpm package manager
-- No third-party UI library — all components are custom
+React 18 + TypeScript + Tailwind 3 (`darkMode: 'class'`), Vite 6. Provider chain in `App.tsx`: `I18nProvider → NetworkProvider → EditorProvider → Shell`. View routing is `useState` in `Shell` (left icon rail, no router).
+- `features/{packet-editor, sniffer, sequence, monitor, templates}/` — one view each.
+- `lib/api.ts` — typed facade over the generated `commands` (unwraps tauri-specta `Result`).
+- `lib/protocols.ts` — frontend field metadata + `buildSpec(proto, values) → PacketSpec` (type-safe constructor).
+- `lib/hexdump.ts`, `lib/templates.ts` (localStorage), `lib/i18n.ts` (zh/en dict).
+- `contexts/{network, editor, i18n}.tsx`.
+- `api/bindings.ts` — **generated; never hand-edit** (run `cargo test` to regenerate).
 
-**Component hierarchy:**
-```
-App → ToastProvider → NetworkInterfaceProvider → BatchTaskProvider → AppContent (tab routing)
-```
+### Design
+Industrial-signal-console aesthetic (dark; Chakra Petch + IBM Plex Mono/Sans; amber/cyan signal palette). Reference prototype: `docs/design/bitsender-v2.html`.
 
-Three main tabs: PacketEditor, NetworkSniffer, TemplateManager (ResponseMonitor exists but is hidden)
-
-**Key directories:**
-- `features/` — main functional modules (packetEditor, networkSniffer, templateManager, responseMonitor)
-- `contexts/` — React Context providers for global state (BatchTask, NetworkInterface, Toast)
-- `hooks/` — custom hooks (`useNetwork` wraps Tauri invoke calls, `useTheme`, `useLanguage`)
-- `locales/` — i18n with `zh-CN.json` / `en-US.json`, custom `useTranslation` hook
-
-### Backend (`src-tauri/`)
-- Rust with Tauri 2.x, tokio async runtime
-- `lib.rs` — all Tauri command definitions and app setup
-- `network/mod.rs` — shared types, `send_packet`, TaskMap type aliases
-- `network/packet_builder.rs` — raw packet byte construction per protocol
-- `network/interface.rs` — pcap device wrapper, NetworkSender
-- `network/packet_sniffer.rs` — SnifferManager for async packet capture
-- `network/sequence_sender.rs` — sequential packet sending with loop support
-- `network/interface_manager.rs` — network adapter isolation/restore (platform-specific)
-
-### Frontend ↔ Backend Communication
-All via Tauri `invoke()`. Key commands: `send_packet`, `build_packet_preview`, `get_network_interfaces`, `start_batch_send`/`stop_batch_send`/`get_batch_send_status`, `start_sequence_send`/`stop_sequence_send`, `start_packet_capture`/`stop_packet_capture`/`get_captured_packets`.
-
-## Version Management
-
-Version must be updated in **3 files simultaneously**:
-1. `package.json` — `version`
-2. `src-tauri/Cargo.toml` — `[package] version`
-3. `src-tauri/tauri.conf.json` — `version`
-
-Always use `scripts/release.sh` to avoid desync.
+## i18n
+`lib/i18n.ts` is a flat zh-CN/en-US dictionary; `useI18n()` returns `{ t, lang, setLang }` (lang persisted in localStorage). UI text uses `t("key")`; field labels use `t(\`field.${key}\`)`. **Adding UI text means adding the key to both zh and en.**
 
 ## Platform Requirements
+- **Windows**: Npcap (WinPcap API compat). **macOS**: `xattr -cr` after install; sending needs sudo. **Linux**: `libpcap-dev` + webkit2gtk system deps.
 
-- **Windows**: Npcap required (WinPcap API compat mode)
-- **macOS**: `xattr -cr` after install; sending packets needs sudo
-- **Linux**: `libpcap-dev` + Webkit2Gtk system deps
+## Gotchas
+- `src/api/bindings.ts` is generated by the `specta_export` test in `lib.rs` — never hand-edit; run `cargo test` after changing command signatures or specs.
+- `PacketSpec` serde tag is `kind` (not `protocol`) — `Ipv4Spec` already has a `protocol` IP-number field, so a `protocol` tag would collapse the TS union to `never`.
+- CI clippy gate is `-D warnings` (v2 is clean); `cargo build` must stay warning-free.
+- esbuild build gate is handled by `pnpm-workspace.yaml` `allowBuilds: { esbuild: true }` + `.npmrc` `verify-deps-before-run=false`.
+- localStorage keys: `bitsender-v2-templates`, `bitsender-v2-lang`, `bitSender-theme`.
+- Plan & progress: `docs/REWRITE_PLAN.md` (milestones M0–M8 all complete).
