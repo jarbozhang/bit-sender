@@ -221,12 +221,12 @@ impl CaptureState {
 
         // 启动即验证网卡可打开（修 v1 静默失败）。
         let device = pcap::Device::list()
-            .map_err(|e| format!("枚举网卡失败: {}", e))?
+            .map_err(|e| format!("枚举网卡失败: {e}"))?
             .into_iter()
             .find(|d| d.name == interface_name)
-            .ok_or_else(|| format!("未找到网卡: {}", interface_name))?;
+            .ok_or_else(|| format!("未找到网卡: {interface_name}"))?;
         let mut cap = pcap::Capture::from_device(device)
-            .map_err(|e| format!("创建捕获实例失败: {}", e))?
+            .map_err(|e| format!("创建捕获实例失败: {e}"))?
             .promisc(true)
             .snaplen(65535)
             .timeout(250)
@@ -234,8 +234,7 @@ impl CaptureState {
             .open()
             .map_err(|e| {
                 format!(
-                    "打开网卡 {} 失败：通常是权限问题。\n解决：\n  • macOS/Linux: sudo 运行，或 sudo setcap cap_net_raw+ep <程序>\n  • Windows: 安装 Npcap 并以管理员运行\n原始错误: {}",
-                    interface_name, e
+                    "打开网卡 {interface_name} 失败：通常是权限问题。\n解决：\n  • macOS/Linux: sudo 运行，或 sudo setcap cap_net_raw+ep <程序>\n  • Windows: 安装 Npcap 并以管理员运行\n原始错误: {e}"
                 )
             })?;
 
@@ -332,12 +331,12 @@ impl CaptureState {
 
 /// pcap 包头 timeval → UNIX 秒。tv_sec/tv_usec 在不同平台宽度不一，统一转 i64 再取。
 fn ts_secs(ts: &libc::timeval) -> u64 {
-    (ts.tv_sec as i64).max(0) as u64
+    ts.tv_sec.max(0) as u64
 }
 
 /// pcap 包头 timeval → UNIX 毫秒。
 fn ts_millis(ts: &libc::timeval) -> u64 {
-    let secs = (ts.tv_sec as i64).max(0) as u64;
+    let secs = ts.tv_sec.max(0) as u64;
     let usecs = (ts.tv_usec as i64).max(0) as u64;
     secs * 1000 + usecs / 1000
 }
@@ -374,7 +373,7 @@ fn parse_packet(data: &[u8], timestamp_ms: u64, size: u64) -> CapturedPacket {
         0x0800 => parse_ipv4(&data[14..], &mut pkt),
         0x0806 => parse_arp(&data[14..], &mut pkt),
         _ => {
-            pkt.info = format!("EtherType 0x{:04X}", ether_type);
+            pkt.info = format!("EtherType 0x{ether_type:04X}");
         }
     }
     pkt
@@ -435,7 +434,7 @@ fn parse_ipv4(data: &[u8], pkt: &mut CapturedPacket) {
                 } else {
                     format!(" [{}]", fl.join(", "))
                 };
-                pkt.info = format!("{} → {}{}", sp, dp, fs);
+                pkt.info = format!("{sp} → {dp}{fs}");
             } else {
                 pkt.info = "TCP（短头）".to_string();
             }
@@ -461,9 +460,9 @@ fn parse_ipv4(data: &[u8], pkt: &mut CapturedPacket) {
                 pkt.info = match t {
                     0 => "Echo reply".to_string(),
                     8 => "Echo request".to_string(),
-                    3 => format!("Destination unreachable (code {})", c),
-                    11 => format!("Time exceeded (TTL={})", ttl),
-                    _ => format!("Type {} Code {}", t, c),
+                    3 => format!("Destination unreachable (code {c})"),
+                    11 => format!("Time exceeded (TTL={ttl})"),
+                    _ => format!("Type {t} Code {c}"),
                 };
             } else {
                 pkt.info = "ICMP（短头）".to_string();
@@ -471,7 +470,7 @@ fn parse_ipv4(data: &[u8], pkt: &mut CapturedPacket) {
         }
         _ => {
             pkt.protocol = "other".to_string();
-            pkt.info = format!("IPv4 proto {} TTL={}", proto, ttl);
+            pkt.info = format!("IPv4 proto {proto} TTL={ttl}");
         }
     }
 }
@@ -488,9 +487,9 @@ fn parse_arp(data: &[u8], pkt: &mut CapturedPacket) {
     pkt.src_ip = Some(sender_ip.clone());
     pkt.dst_ip = Some(target_ip.clone());
     pkt.info = match oper {
-        1 => format!("Who has {}? Tell {}", target_ip, sender_ip),
+        1 => format!("Who has {target_ip}? Tell {sender_ip}"),
         2 => format!("{} is at {}", sender_ip, pkt.src_mac),
-        _ => format!("ARP op {} {} -> {}", oper, sender_ip, target_ip),
+        _ => format!("ARP op {oper} {sender_ip} -> {target_ip}"),
     };
 }
 

@@ -289,8 +289,7 @@ mod dispatch_tests {
             let frame = spec.build().expect("派发 build 应成功");
             assert!(
                 frame.len() >= MIN_ETHERNET_FRAME,
-                "帧不应短于最小帧: {:?}",
-                spec
+                "帧不应短于最小帧: {spec:?}"
             );
         }
     }

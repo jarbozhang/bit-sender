@@ -29,9 +29,8 @@ jobs:
           components: clippy
       - name: cargo test (hard gate)
         run: cargo test --locked
-      # clippy 暂为 informational：v1 遗留 ~108 条警告，M8 清债后收紧为 `-D warnings`
-      - name: cargo clippy (informational until M8)
-        run: cargo clippy --all-targets || true
+      - name: cargo clippy (-D warnings)
+        run: cargo clippy --all-targets -- -D warnings
 
   frontend:
     name: Frontend (typecheck + vitest)

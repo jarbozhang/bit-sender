@@ -75,7 +75,7 @@ pub fn start_sequence(
         .iter()
         .map(|s| s.spec.build().map(|b| (b, s.delay_ms)))
         .collect::<Result<_, _>>()
-        .map_err(|e| format!("序列中存在非法报文: {}", e))?;
+        .map_err(|e| format!("序列中存在非法报文: {e}"))?;
     drop(PacketSender::open(&interface_name)?);
 
     let task_id = uuid::Uuid::new_v4().to_string();

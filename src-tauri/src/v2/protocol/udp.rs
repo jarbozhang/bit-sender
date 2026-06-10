@@ -142,7 +142,7 @@ mod golden {
                 assert_eq!(udp.destination_port, 53);
                 assert_eq!(udp.length, 12);
             }
-            other => panic!("期望 UDP 传输头，得到 {:?}", other),
+            other => panic!("期望 UDP 传输头，得到 {other:?}"),
         }
     }
 

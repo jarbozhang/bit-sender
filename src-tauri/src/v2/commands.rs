@@ -33,7 +33,7 @@ pub struct SendReport {
 #[specta::specta]
 pub fn build_packet_preview_v2(spec: PacketSpec) -> Result<String, String> {
     let bytes = spec.build().map_err(|e| e.to_string())?;
-    Ok(bytes.iter().map(|b| format!("{:02X}", b)).collect())
+    Ok(bytes.iter().map(|b| format!("{b:02X}")).collect())
 }
 
 /// 枚举本机网卡（v2）。

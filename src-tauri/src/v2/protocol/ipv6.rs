@@ -107,7 +107,7 @@ mod golden {
                 assert_eq!(ip.source, std::net::Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1).octets());
                 assert_eq!(ip.hop_limit, 64);
             }
-            other => panic!("期望 IPv6 网络头，得到 {:?}", other),
+            other => panic!("期望 IPv6 网络头，得到 {other:?}"),
         }
     }
 

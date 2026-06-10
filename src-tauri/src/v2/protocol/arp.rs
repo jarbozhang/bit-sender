@@ -123,7 +123,7 @@ mod golden {
                 assert_eq!(eth.destination, [0xFF; 6]);
                 assert_eq!(u16::from(eth.ether_type), 0x0806);
             }
-            other => panic!("期望 Ethernet2 链路头，得到 {:?}", other),
+            other => panic!("期望 Ethernet2 链路头，得到 {other:?}"),
         }
     }
 }

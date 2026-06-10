@@ -208,7 +208,7 @@ mod golden {
                 assert!(tcp.syn);
                 assert!(!tcp.ack);
             }
-            other => panic!("期望 TCP 传输头，得到 {:?}", other),
+            other => panic!("期望 TCP 传输头，得到 {other:?}"),
         }
     }
 

@@ -17,7 +17,7 @@ pub struct InterfaceInfo {
 
 /// 枚举本机网卡。失败返回可直接展示给前端的错误串。
 pub fn list_interfaces() -> Result<Vec<InterfaceInfo>, String> {
-    let devices = Device::list().map_err(|e| format!("枚举网卡失败: {}", e))?;
+    let devices = Device::list().map_err(|e| format!("枚举网卡失败: {e}"))?;
     Ok(devices
         .into_iter()
         .map(|d| {
@@ -44,19 +44,18 @@ pub struct PacketSender {
 impl PacketSender {
     pub fn open(name: &str) -> Result<Self, String> {
         let device = Device::list()
-            .map_err(|e| format!("枚举网卡失败: {}", e))?
+            .map_err(|e| format!("枚举网卡失败: {e}"))?
             .into_iter()
             .find(|d| d.name == name)
-            .ok_or_else(|| format!("未找到网卡: {}", name))?;
+            .ok_or_else(|| format!("未找到网卡: {name}"))?;
         let cap = Capture::from_device(device)
-            .map_err(|e| format!("创建捕获实例失败: {}", e))?
+            .map_err(|e| format!("创建捕获实例失败: {e}"))?
             .promisc(true)
             .snaplen(65535)
             .open()
             .map_err(|e| {
                 format!(
-                    "打开网卡 {} 失败：通常是权限问题。\n解决：\n  • macOS/Linux: sudo 运行，或 sudo setcap cap_net_raw+ep <程序>\n  • Windows: 安装 Npcap 并以管理员运行\n原始错误: {}",
-                    name, e
+                    "打开网卡 {name} 失败：通常是权限问题。\n解决：\n  • macOS/Linux: sudo 运行，或 sudo setcap cap_net_raw+ep <程序>\n  • Windows: 安装 Npcap 并以管理员运行\n原始错误: {e}"
                 )
             })?;
         Ok(Self { cap })
@@ -65,6 +64,6 @@ impl PacketSender {
     pub fn send(&mut self, bytes: &[u8]) -> Result<(), String> {
         self.cap
             .sendpacket(bytes)
-            .map_err(|e| format!("发送数据包失败（检查权限/网卡状态）: {}", e))
+            .map_err(|e| format!("发送数据包失败（检查权限/网卡状态）: {e}"))
     }
 }

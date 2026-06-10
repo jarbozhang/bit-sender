@@ -128,7 +128,7 @@ impl TestType {
         match s {
             "ping" => Ok(TestType::Ping),
             "arp" => Ok(TestType::Arp),
-            other => Err(format!("不支持的 test_type: {}（仅 ping/arp）", other)),
+            other => Err(format!("不支持的 test_type: {other}（仅 ping/arp）")),
         }
     }
 }
@@ -257,17 +257,17 @@ impl MonitorState {
             let running = self.running.clone();
             let shared = self.shared.clone();
             let device = pcap::Device::list()
-                .map_err(|e| format!("枚举网卡失败: {}", e))?
+                .map_err(|e| format!("枚举网卡失败: {e}"))?
                 .into_iter()
                 .find(|d| d.name == interface_name)
-                .ok_or_else(|| format!("未找到网卡: {}", interface_name))?;
+                .ok_or_else(|| format!("未找到网卡: {interface_name}"))?;
             let mut cap = pcap::Capture::from_device(device)
-                .map_err(|e| format!("创建捕获实例失败: {}", e))?
+                .map_err(|e| format!("创建捕获实例失败: {e}"))?
                 .promisc(true)
                 .snaplen(65535)
                 .timeout(250)
                 .open()
-                .map_err(|e| format!("打开网卡 {} 失败: {}", interface_name, e))?;
+                .map_err(|e| format!("打开网卡 {interface_name} 失败: {e}"))?;
             let target_ip = config.target_ip.clone();
             handles.push(std::thread::spawn(move || {
                 while running.load(Ordering::Relaxed) {
@@ -363,16 +363,16 @@ impl LocalAddr {
         let iface = ifaces
             .into_iter()
             .find(|i| i.name == interface_name)
-            .ok_or_else(|| format!("未找到网卡: {}", interface_name))?;
+            .ok_or_else(|| format!("未找到网卡: {interface_name}"))?;
         let mac = iface
             .mac
-            .ok_or_else(|| format!("网卡 {} 无 MAC 地址，无法发送测试包", interface_name))?;
+            .ok_or_else(|| format!("网卡 {interface_name} 无 MAC 地址，无法发送测试包"))?;
         // addresses 里可能混有 IPv6（addr.to_string()），筛出第一个能解析为 IPv4 的。
         let ip = iface
             .addresses
             .into_iter()
             .find(|a| parse_ipv4_str(a).is_some())
-            .ok_or_else(|| format!("网卡 {} 无 IPv4 地址，无法发送测试包", interface_name))?;
+            .ok_or_else(|| format!("网卡 {interface_name} 无 IPv4 地址，无法发送测试包"))?;
         Ok(Self { mac, ip })
     }
 }
@@ -583,7 +583,7 @@ mod tests {
         let m = take_match(&mut pending, &resp).expect("应命中 seq=7 的 pending");
         assert_eq!(m.0, 7);
         let rtt = now.duration_since(m.1).as_secs_f64() * 1000.0;
-        assert!(rtt > 0.0, "RTT 应为正，得到 {}", rtt);
+        assert!(rtt > 0.0, "RTT 应为正，得到 {rtt}");
         assert!(pending.is_empty(), "命中后应从 pending 移除");
     }
 

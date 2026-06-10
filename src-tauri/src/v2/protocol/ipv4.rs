@@ -39,6 +39,7 @@ pub struct Ipv4Spec {
 /// 共用 IPv4 头构造器：返回 20 字节头（仅 IHL=5 无选项）。
 /// `total_len` = IP 头 + L4 段总字节；`checksum_override` 见上文语义。
 /// 失败仅来自 IP 地址解析。
+#[allow(clippy::too_many_arguments)] // IPv4 头字段本就多，平铺参数比再包一层 struct 更直观
 pub(crate) fn build_ipv4_header(
     version: u8,
     ihl: u8,
@@ -194,7 +195,7 @@ mod golden {
                 // etherparse 解析时不报头部校验和错误即说明我们算对了。
                 assert_eq!(ip.header_checksum, ip.calc_header_checksum());
             }
-            other => panic!("期望 IPv4 网络头，得到 {:?}", other),
+            other => panic!("期望 IPv4 网络头，得到 {other:?}"),
         }
     }
 }

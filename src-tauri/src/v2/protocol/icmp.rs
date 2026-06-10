@@ -159,9 +159,9 @@ mod golden {
                     assert_eq!(echo.id, 1);
                     assert_eq!(echo.seq, 1);
                 }
-                other => panic!("期望 EchoRequest，得到 {:?}", other),
+                other => panic!("期望 EchoRequest，得到 {other:?}"),
             },
-            other => panic!("期望 ICMPv4 传输头，得到 {:?}", other),
+            other => panic!("期望 ICMPv4 传输头，得到 {other:?}"),
         }
     }
 
