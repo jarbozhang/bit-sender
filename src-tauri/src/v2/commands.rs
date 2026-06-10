@@ -5,9 +5,11 @@
 //! 数值字段写成字符串、拼错字段名或漏填，TS 编译即失败。
 
 use super::capture::{CaptureState, CaptureStats, CapturedPacket};
+use super::monitor::{MonitorState, MonitorStats, TestConfig, TestResult};
 use super::net::{self, InterfaceInfo, PacketSender};
 use super::protocol::PacketSpec;
 use super::sender::{BatchRegistry, BatchStatus};
+use super::sequence::{SequenceRegistry, SequenceStatus, SequenceStep};
 use serde::Serialize;
 use specta::Type;
 use std::sync::Arc;
@@ -126,4 +128,70 @@ pub fn get_captured_packets_v2(
     state: State<'_, Arc<CaptureState>>,
 ) -> Vec<CapturedPacket> {
     state.packets(max_count)
+}
+
+/// 启动响应监控 / RTT（v2）。后端自己发测试包 + pcap 抓包匹配，RTT 用收发 Instant 差。
+/// 启动即验证网卡可打开 + 能取到本机 ip/mac，失败 Err；幂等：已在跑先停。
+/// 前端用轮询拉 `get_monitor_results_v2` / `get_monitor_stats_v2`。
+#[tauri::command]
+#[specta::specta]
+pub fn start_monitor_v2(
+    interface_name: String,
+    config: TestConfig,
+    state: State<'_, Arc<MonitorState>>,
+) -> Result<(), String> {
+    state.start(interface_name, config)
+}
+
+/// 停止响应监控（v2）。
+#[tauri::command]
+#[specta::specta]
+pub fn stop_monitor_v2(state: State<'_, Arc<MonitorState>>) -> Result<(), String> {
+    state.stop()
+}
+
+/// 拉取最新监控结果（v2，最新在前）。默认 50。
+#[tauri::command]
+#[specta::specta]
+pub fn get_monitor_results_v2(
+    max_count: Option<u32>,
+    state: State<'_, Arc<MonitorState>>,
+) -> Vec<TestResult> {
+    state.results(max_count)
+}
+
+/// 查询当前监控统计快照（v2）。
+#[tauri::command]
+#[specta::specta]
+pub fn get_monitor_stats_v2(state: State<'_, Arc<MonitorState>>) -> Option<MonitorStats> {
+    state.stats()
+}
+
+/// 启动序列发送（v2）：按序定时发包 + 循环 loop_count 轮。
+#[tauri::command]
+#[specta::specta]
+pub fn start_sequence_v2(
+    steps: Vec<SequenceStep>,
+    interface_name: String,
+    loop_count: u32,
+    registry: State<'_, Arc<SequenceRegistry>>,
+) -> Result<String, String> {
+    super::sequence::start_sequence(registry.inner().clone(), steps, interface_name, loop_count)
+}
+
+/// 查询序列任务状态。
+#[tauri::command]
+#[specta::specta]
+pub fn get_sequence_status_v2(
+    task_id: String,
+    registry: State<'_, Arc<SequenceRegistry>>,
+) -> Option<SequenceStatus> {
+    registry.status(&task_id)
+}
+
+/// 停止序列任务。
+#[tauri::command]
+#[specta::specta]
+pub fn stop_sequence_v2(task_id: String, registry: State<'_, Arc<SequenceRegistry>>) -> bool {
+    registry.stop(&task_id)
 }

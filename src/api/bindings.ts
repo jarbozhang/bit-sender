@@ -101,6 +101,65 @@ async getCaptureStatsV2() : Promise<CaptureStats | null> {
  */
 async getCapturedPacketsV2(maxCount: number | null) : Promise<CapturedPacket[]> {
     return await TAURI_INVOKE("get_captured_packets_v2", { maxCount });
+},
+/**
+ * 启动响应监控 / RTT（v2）。后端自己发测试包 + pcap 抓包匹配，RTT 用收发 Instant 差。
+ * 启动即验证网卡可打开 + 能取到本机 ip/mac，失败 Err；幂等：已在跑先停。
+ * 前端用轮询拉 `get_monitor_results_v2` / `get_monitor_stats_v2`。
+ */
+async startMonitorV2(interfaceName: string, config: TestConfig) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_monitor_v2", { interfaceName, config }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 停止响应监控（v2）。
+ */
+async stopMonitorV2() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_monitor_v2") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 拉取最新监控结果（v2，最新在前）。默认 50。
+ */
+async getMonitorResultsV2(maxCount: number | null) : Promise<TestResult[]> {
+    return await TAURI_INVOKE("get_monitor_results_v2", { maxCount });
+},
+/**
+ * 查询当前监控统计快照（v2）。
+ */
+async getMonitorStatsV2() : Promise<MonitorStats | null> {
+    return await TAURI_INVOKE("get_monitor_stats_v2");
+},
+/**
+ * 启动序列发送（v2）：按序定时发包 + 循环 loop_count 轮。
+ */
+async startSequenceV2(steps: SequenceStep[], interfaceName: string, loopCount: number) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_sequence_v2", { steps, interfaceName, loopCount }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 查询序列任务状态。
+ */
+async getSequenceStatusV2(taskId: string) : Promise<SequenceStatus | null> {
+    return await TAURI_INVOKE("get_sequence_status_v2", { taskId });
+},
+/**
+ * 停止序列任务。
+ */
+async stopSequenceV2(taskId: string) : Promise<boolean> {
+    return await TAURI_INVOKE("stop_sequence_v2", { taskId });
 }
 }
 
@@ -171,6 +230,10 @@ dscp_ecn: number; identification: number;
  */
 flags: number; fragment_offset: number; ttl: number; protocol: number; checksum: number | null; src_ip: string; dst_ip: string; payload_hex: string }
 /**
+ * 监控聚合统计。avg/min/max 仅对 success 的 rtt 累计。
+ */
+export type MonitorStats = { total: number; success: number; timeout: number; avg_rtt_ms: number; min_rtt_ms: number; max_rtt_ms: number }
+/**
  * 顶层协议派发枚举。`kind` 字段做 serde 标签，前端按 `{ kind: "tcp", ... }`
  * 发来，反序列化直接落到对应变体。每个变体携带构建**完整以太网帧**所需的全部字段。
  * 注意：标签用 `kind` 而非 `protocol`，因为 `Ipv4Spec` 已有名为 `protocol` 的
@@ -181,6 +244,11 @@ export type PacketSpec = ({ kind: "ethernet" } & EthernetSpec) | ({ kind: "arp" 
  * 单发结果：发出的字节数 + 出口网卡名。
  */
 export type SendReport = { bytes: number; interface: string }
+export type SequenceStatus = { task_id: string; current_index: number; current_loop: number; total_sent: number; running: boolean; completed: boolean }
+/**
+ * 序列中的一步：一个强类型报文 + 其后的延迟。
+ */
+export type SequenceStep = { spec: PacketSpec; delay_ms: number }
 /**
  * TCP 帧规格。以太网头 + IPv4 头(常用子集) + TCP 头(20B, 无选项) + payload。
  * IPv4 层用固定默认（version 4 / ihl 5 / dscp 0 / flags DF / offset 0 / 自动算 IP 校验和），
@@ -191,6 +259,34 @@ export type TcpSpec = { dst_mac: string; src_mac: string; ttl: number; identific
  * 数据偏移（以 4 字节为单位），无选项时为 5。会被 clamp 到 [5,15]。
  */
 data_offset: number; flag_urg: boolean; flag_ack: boolean; flag_psh: boolean; flag_rst: boolean; flag_syn: boolean; flag_fin: boolean; window_size: number; checksum: number | null; urgent_pointer: number; payload_hex: string }
+/**
+ * 测试配置（前端下发）。
+ */
+export type TestConfig = { 
+/**
+ * "ping" | "arp"。
+ */
+test_type: string; target_ip: string; interval_ms: number; timeout_ms: number; 
+/**
+ * 发送总数；0 = 无限。
+ */
+count: number }
+/**
+ * 单次测试结果（推给前端）。
+ */
+export type TestResult = { id: string; seq: number; 
+/**
+ * "success" | "timeout"。
+ */
+status: string; 
+/**
+ * 成功时为 RTT 毫秒（收发 Instant 差），超时为 None。
+ */
+rtt_ms: number | null; 
+/**
+ * 结果产生时刻（UNIX 毫秒，仅供前端排序/展示）。
+ */
+timestamp_ms: number }
 /**
  * UDP 帧规格。IPv4 层同 TcpSpec 用固定默认，仅暴露 ttl/identification。
  */

@@ -2,13 +2,18 @@ import { useState } from "react";
 import { NetworkProvider, useNetwork } from "./contexts/network";
 import { PacketEditor } from "./features/packet-editor/PacketEditor";
 import { SnifferView } from "./features/sniffer/SnifferView";
+import { TemplateLibrary } from "./features/templates/TemplateLibrary";
+import { SequenceView } from "./features/sequence/SequenceView";
+import { MonitorView } from "./features/monitor/MonitorView";
+import { EditorProvider } from "./contexts/editor";
 
-type ViewId = "editor" | "sniffer" | "sequence" | "templates" | "config";
+type ViewId = "editor" | "sniffer" | "sequence" | "monitor" | "templates" | "config";
 
 const RAIL: { id: ViewId; label: string; path: string }[] = [
   { id: "editor", label: "报文编辑", path: "M3 11l18-8-8 18-2-7-8-3z" },
   { id: "sniffer", label: "网口嗅探", path: "M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3" },
   { id: "sequence", label: "序列发送", path: "M4 6h16M4 12h16M4 18h10" },
+  { id: "monitor", label: "响应监控", path: "M3 12h4l2 6 4-12 2 6h4" },
   { id: "templates", label: "模板库", path: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" },
   { id: "config", label: "配置", path: "M12 9a3 3 0 100 6 3 3 0 000-6zM12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2" },
 ];
@@ -99,6 +104,12 @@ function Shell() {
             <PacketEditor />
           ) : view === "sniffer" ? (
             <SnifferView />
+          ) : view === "templates" ? (
+            <TemplateLibrary onLoaded={() => setView("editor")} />
+          ) : view === "sequence" ? (
+            <SequenceView />
+          ) : view === "monitor" ? (
+            <MonitorView />
           ) : (
             <Placeholder name={RAIL.find((r) => r.id === view)!.label} />
           )}
@@ -118,7 +129,9 @@ function Shell() {
 export default function App() {
   return (
     <NetworkProvider>
-      <Shell />
+      <EditorProvider>
+        <Shell />
+      </EditorProvider>
     </NetworkProvider>
   );
 }

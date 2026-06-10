@@ -12,14 +12,14 @@ import {
 } from "../../lib/protocols";
 import { toHexRows, byteLength } from "../../lib/hexdump";
 import { useNetwork } from "../../contexts/network";
+import { useEditor } from "../../contexts/editor";
 import { BatchDialog } from "./BatchDialog";
 
 type SendMsg = { kind: "ok" | "err" | "idle"; text: string };
 
 export function PacketEditor() {
   const { selected } = useNetwork();
-  const [proto, setProto] = useState<ProtoKey>("tcp");
-  const [values, setValues] = useState<Record<string, string | boolean>>(() => defaultValues("tcp"));
+  const { proto, values, setProto, setValue } = useEditor();
   const [previewHex, setPreviewHex] = useState("");
   const [previewErr, setPreviewErr] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -27,12 +27,6 @@ export function PacketEditor() {
   const [showBatch, setShowBatch] = useState(false);
 
   const def = getProto(proto);
-  const set = (k: string, v: string | boolean) => setValues((prev) => ({ ...prev, [k]: v }));
-
-  const switchProto = (p: ProtoKey) => {
-    setProto(p);
-    setValues(defaultValues(p));
-  };
 
   // 字段按组聚合（保持声明顺序）
   const groups = useMemo(() => {
@@ -102,7 +96,7 @@ export function PacketEditor() {
         {PROTOCOLS.map((p) => (
           <button
             key={p.key}
-            onClick={() => switchProto(p.key)}
+            onClick={() => setProto(p.key)}
             className={`font-display font-medium text-xs tracking-[0.1em] px-[18px] py-2.5 relative transition ${proto === p.key ? "text-amber" : "text-dim hover:text-txt"}`}
           >
             {p.label}
@@ -131,7 +125,7 @@ export function PacketEditor() {
                         <label className="text-[10px] tracking-wide uppercase text-dim">{f.label}</label>
                         <input
                           value={String(values[f.key] ?? "")}
-                          onChange={(e) => set(f.key, e.target.value)}
+                          onChange={(e) => setValue(f.key, e.target.value)}
                           placeholder={f.placeholder}
                           spellCheck={false}
                           className="font-mono text-[13px] font-medium text-txt bg-bg border border-line-bright rounded px-2.5 py-1.5 outline-none focus:border-amber focus:shadow-glow-amber transition w-full"
@@ -148,7 +142,7 @@ export function PacketEditor() {
                       return (
                         <button
                           key={f.key}
-                          onClick={() => set(f.key, !on)}
+                          onClick={() => setValue(f.key, !on)}
                           className={`font-mono text-[10px] font-semibold tracking-wide border rounded px-2.5 py-1 transition ${on ? "text-amber border-amber-dim bg-amber/10 shadow-glow-amber" : "text-faint border-line-bright hover:text-dim"}`}
                         >
                           {f.label}

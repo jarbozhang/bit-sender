@@ -6,9 +6,11 @@
 
 pub mod capture;
 pub mod commands;
+pub mod monitor;
 pub mod net;
 pub mod protocol;
 pub mod sender;
+pub mod sequence;
 
 pub use commands::build_packet_preview_v2;
 pub use protocol::PacketSpec;

@@ -821,6 +821,8 @@ pub fn run() {
         .manage(InterfaceManagerState::new(Mutex::new(InterfaceManager::new().expect("无法初始化接口管理器"))))
         .manage(std::sync::Arc::new(v2::sender::BatchRegistry::default()))
         .manage(std::sync::Arc::new(v2::capture::CaptureState::default()))
+        .manage(std::sync::Arc::new(v2::monitor::MonitorState::default()))
+        .manage(std::sync::Arc::new(v2::sequence::SequenceRegistry::default()))
         .invoke_handler(tauri::generate_handler![
             greet,
             build_packet_preview,
@@ -853,7 +855,14 @@ pub fn run() {
             v2::commands::start_capture_v2,
             v2::commands::stop_capture_v2,
             v2::commands::get_capture_stats_v2,
-            v2::commands::get_captured_packets_v2
+            v2::commands::get_captured_packets_v2,
+            v2::commands::start_monitor_v2,
+            v2::commands::stop_monitor_v2,
+            v2::commands::get_monitor_results_v2,
+            v2::commands::get_monitor_stats_v2,
+            v2::commands::start_sequence_v2,
+            v2::commands::get_sequence_status_v2,
+            v2::commands::stop_sequence_v2
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -876,7 +885,14 @@ mod specta_export {
                 crate::v2::commands::start_capture_v2,
                 crate::v2::commands::stop_capture_v2,
                 crate::v2::commands::get_capture_stats_v2,
-                crate::v2::commands::get_captured_packets_v2
+                crate::v2::commands::get_captured_packets_v2,
+                crate::v2::commands::start_monitor_v2,
+                crate::v2::commands::stop_monitor_v2,
+                crate::v2::commands::get_monitor_results_v2,
+                crate::v2::commands::get_monitor_stats_v2,
+                crate::v2::commands::start_sequence_v2,
+                crate::v2::commands::get_sequence_status_v2,
+                crate::v2::commands::stop_sequence_v2
             ]);
         builder
             .export(

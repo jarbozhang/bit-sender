@@ -1,0 +1,116 @@
+import { useState } from "react";
+import { useEditor } from "../../contexts/editor";
+import { getProto, buildSpec, type ProtoKey } from "../../lib/protocols";
+import { api, type SequenceStep } from "../../lib/api";
+import { useNetwork } from "../../contexts/network";
+
+export interface SeqItem {
+  id: string;
+  name: string;
+  proto: ProtoKey;
+  values: Record<string, string | boolean>;
+  delayMs: number;
+  enabled: boolean;
+}
+
+let seqCounter = 0;
+
+export function SequenceView() {
+  const { proto, values } = useEditor();
+  const { selected } = useNetwork();
+  const [seq, setSeq] = useState<SeqItem[]>([]);
+  const [loopCount, setLoopCount] = useState(1);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err" | "idle"; text: string }>({ kind: "idle", text: "READY" });
+
+  const addCurrent = () => {
+    seqCounter += 1;
+    setSeq((s) => [
+      ...s,
+      { id: `seq-${seqCounter}`, name: `${getProto(proto).label} 包 ${s.length + 1}`, proto, values: { ...values }, delayMs: 100, enabled: true },
+    ]);
+  };
+  const remove = (id: string) => setSeq((s) => s.filter((p) => p.id !== id));
+  const move = (i: number, dir: -1 | 1) => {
+    setSeq((s) => {
+      const j = i + dir;
+      if (j < 0 || j >= s.length) return s;
+      const next = [...s];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+  const update = (id: string, patch: Partial<SeqItem>) =>
+    setSeq((s) => s.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+
+  const enabled = seq.filter((p) => p.enabled);
+
+  const start = async () => {
+    if (!selected) {
+      setMsg({ kind: "err", text: "请先选择网卡" });
+      return;
+    }
+    try {
+      const steps: SequenceStep[] = enabled.map((p) => ({
+        spec: buildSpec(p.proto, p.values),
+        delay_ms: p.delayMs,
+      }));
+      const id = await api.startSequence(steps, selected.name, loopCount);
+      setMsg({ kind: "ok", text: `序列已启动 · 任务 ${id.slice(0, 8)}` });
+    } catch (e) {
+      setMsg({ kind: "err", text: String(e) });
+    }
+  };
+
+  return (
+    <div className="boot">
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">Packet Sequence</h1>
+        <span className="font-mono text-[11px] text-faint tracking-wide">// 序列发送 · 按序定时</span>
+        <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,#1b2a33 0 6px,transparent 6px 12px)" }} />
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button onClick={addCurrent} className="font-display text-xs uppercase tracking-wide px-3.5 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 transition">+ 添加当前包</button>
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="font-mono text-[11px] text-dim">循环</span>
+          <input type="number" min={1} value={loopCount} onChange={(e) => setLoopCount(Math.max(1, Number(e.target.value)))} className="w-20 font-mono text-[12px] text-amber bg-bg border border-line-bright rounded px-2 py-1.5 outline-none focus:border-amber" />
+          <span className="font-mono text-[11px] text-dim">次</span>
+        </div>
+      </div>
+
+      {seq.length === 0 ? (
+        <div className="border border-line rounded py-12 text-center font-mono text-xs text-faint">
+          序列为空 · 在编辑器配置好报文后点「添加当前包」
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {seq.map((p, i) => (
+            <div key={p.id} className={`flex items-center gap-3 border rounded p-3 ${p.enabled ? "border-line bg-panel" : "border-line bg-panel opacity-50"}`}>
+              <input type="checkbox" checked={p.enabled} onChange={(e) => update(p.id, { enabled: e.target.checked })} className="accent-amber" />
+              <span className="w-7 h-7 grid place-items-center bg-elevated rounded-full font-mono text-[11px] text-dim">{i + 1}</span>
+              <input value={p.name} onChange={(e) => update(p.id, { name: e.target.value })} className="flex-1 font-ui text-sm text-txt bg-transparent outline-none focus:bg-bg rounded px-1.5 py-1" />
+              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-cyan/10 text-cyan uppercase">{getProto(p.proto).label}</span>
+              <div className="flex items-center gap-1.5">
+                <input type="number" min={0} step={10} value={p.delayMs} onChange={(e) => update(p.id, { delayMs: Math.max(0, Number(e.target.value)) })} className="w-20 font-mono text-[12px] text-txt bg-bg border border-line-bright rounded px-2 py-1 outline-none focus:border-amber" />
+                <span className="font-mono text-[10px] text-faint">ms</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => move(i, -1)} disabled={i === 0} className="p-1 text-faint hover:text-dim disabled:opacity-30">▲</button>
+                <button onClick={() => move(i, 1)} disabled={i === seq.length - 1} className="p-1 text-faint hover:text-dim disabled:opacity-30">▼</button>
+                <button onClick={() => remove(p.id)} className="p-1 text-signalred/70 hover:text-signalred">✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 mt-4 pt-4 border-t border-line">
+        <span className="font-mono text-[11px] text-dim">共 {seq.length} 包 · 启用 {enabled.length}</span>
+        <span className={`font-mono text-[11px] ml-auto ${msg.kind === "ok" ? "text-signalgreen" : msg.kind === "err" ? "text-signalred" : "text-faint"}`}>{msg.text}</span>
+        <button onClick={start} disabled={enabled.length === 0} className="font-display text-xs uppercase tracking-wide px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber disabled:opacity-40 transition">
+          ▶ 开始序列
+        </button>
+      </div>
+    </div>
+  );
+}
