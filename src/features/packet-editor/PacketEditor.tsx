@@ -10,7 +10,7 @@ import {
   type ProtoField,
   type GroupKey,
 } from "../../lib/protocols";
-import { toHexRows, byteLength } from "../../lib/hexdump";
+import { toHexRows, byteLength, generateHexDump, parseHexDump, macFromHex } from "../../lib/hexdump";
 import { useNetwork } from "../../contexts/network";
 import { useEditor } from "../../contexts/editor";
 import { BatchDialog } from "./BatchDialog";
@@ -20,8 +20,8 @@ type SendMsg = { kind: "ok" | "err" | "idle"; text: string };
 
 export function PacketEditor() {
   const { selected } = useNetwork();
-  const { proto, values, setProto, setValue } = useEditor();
-  const { t } = useI18n();
+  const { proto, values, setProto, setValue, load } = useEditor();
+  const { t, lang } = useI18n();
   const [previewHex, setPreviewHex] = useState("");
   const [previewErr, setPreviewErr] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -82,6 +82,53 @@ export function PacketEditor() {
     }
   };
 
+  const L = lang === "zh-CN";
+
+  const onExport = async () => {
+    if (!previewHex) {
+      setSendMsg({ kind: "err", text: L ? "无报文可导出" : "Nothing to export" });
+      return;
+    }
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        defaultPath: `packet_${proto}.txt`,
+        filters: [{ name: "Text", extensions: ["txt"] }],
+      });
+      if (path) {
+        const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+        await writeTextFile(path, generateHexDump(previewHex));
+        setSendMsg({ kind: "ok", text: (L ? "已导出到 " : "Exported to ") + path });
+      }
+    } catch (e) {
+      setSendMsg({ kind: "err", text: String(e) });
+    }
+  };
+
+  const onImport = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const sel = await open({ multiple: false, filters: [{ name: "Text", extensions: ["txt"] }] });
+      if (typeof sel !== "string") return;
+      const { readTextFile } = await import("@tauri-apps/plugin-fs");
+      const hex = parseHexDump(await readTextFile(sel));
+      if (hex.length < 28) {
+        setSendMsg({ kind: "err", text: L ? "解析失败：帧太短" : "Parse failed: frame too short" });
+        return;
+      }
+      // 以 ethernet 协议精确还原：以太头 + 其余字节作 payload，重建即得原帧。
+      load("ethernet", {
+        dst_mac: macFromHex(hex.slice(0, 12)),
+        src_mac: macFromHex(hex.slice(12, 24)),
+        ether_type: hex.slice(24, 28),
+        payload_hex: hex.slice(28),
+      });
+      setSendMsg({ kind: "ok", text: L ? "已导入报文（以太网层还原）" : "Imported packet (restored as Ethernet)" });
+    } catch (e) {
+      setSendMsg({ kind: "err", text: String(e) });
+    }
+  };
+
   const rows = toHexRows(previewHex);
 
   return (
@@ -91,6 +138,8 @@ export function PacketEditor() {
         <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">{t("editor.title")}</h1>
         <span className="font-mono text-[11px] text-faint tracking-wide">{t("editor.subtitle")}</span>
         <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,#1b2a33 0 6px,transparent 6px 12px)" }} />
+        <button onClick={onImport} className="font-mono text-[11px] px-2.5 py-1 rounded border border-line-bright text-dim hover:text-cyan hover:border-cyan/40 transition">{L ? "导入" : "Import"}</button>
+        <button onClick={onExport} className="font-mono text-[11px] px-2.5 py-1 rounded border border-line-bright text-dim hover:text-amber hover:border-amber-dim transition">{L ? "导出" : "Export"}</button>
       </div>
 
       {/* 协议 tab */}
