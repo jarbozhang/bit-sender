@@ -51,7 +51,7 @@ export function TemplateLibrary({ onLoaded }: { onLoaded: () => void }) {
       <div className="flex items-center gap-3 mb-4">
         <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">{t("template.title")}</h1>
         <span className="font-mono text-[11px] text-faint tracking-wide">{t("template.subtitle")}</span>
-        <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,#1b2a33 0 6px,transparent 6px 12px)" }} />
+        <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,rgb(var(--line)) 0 6px,transparent 6px 12px)" }} />
         <button onClick={() => setSaving(true)} className="font-display text-xs tracking-wide uppercase px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber transition">
           {t("template.saveCurrent")}
         </button>

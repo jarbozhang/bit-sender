@@ -145,7 +145,7 @@ export function PacketEditor() {
       <div className="flex items-center gap-3 mb-4">
         <h1 className="font-display font-semibold text-[15px] tracking-[0.16em] uppercase">{t("editor.title")}</h1>
         <span className="font-mono text-[11px] text-faint tracking-wide">{t("editor.subtitle")}</span>
-        <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,#1b2a33 0 6px,transparent 6px 12px)" }} />
+        <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,rgb(var(--line)) 0 6px,transparent 6px 12px)" }} />
         <button onClick={onImport} className="font-mono text-[11px] px-2.5 py-1 rounded border border-line-bright text-dim hover:text-cyan hover:border-cyan/40 transition">{L ? "导入" : "Import"}</button>
         <button onClick={onExport} className="font-mono text-[11px] px-2.5 py-1 rounded border border-line-bright text-dim hover:text-amber hover:border-amber-dim transition">{L ? "导出" : "Export"}</button>
       </div>
