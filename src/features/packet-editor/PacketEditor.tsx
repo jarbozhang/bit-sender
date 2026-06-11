@@ -10,13 +10,20 @@ import {
   type ProtoField,
   type GroupKey,
 } from "../../lib/protocols";
-import { toHexRows, byteLength, generateHexDump, parseHexDump, macFromHex } from "../../lib/hexdump";
+import { toHexRows, byteLength, generateHexDump, parseHexDump, macFromHex, layerBoundaries, layerOf, type LayerKind } from "../../lib/hexdump";
 import { useNetwork } from "../../contexts/network";
 import { useEditor } from "../../contexts/editor";
 import { BatchDialog } from "./BatchDialog";
 import { useI18n } from "../../contexts/i18n";
 
 type SendMsg = { kind: "ok" | "err" | "idle"; text: string };
+
+const LAYER_COLOR: Record<LayerKind, string> = {
+  eth: "text-violet",
+  ip: "text-cyan",
+  l4: "text-amber",
+  payload: "text-faint",
+};
 
 export function PacketEditor() {
   const { selected } = useNetwork();
@@ -130,6 +137,7 @@ export function PacketEditor() {
   };
 
   const rows = toHexRows(previewHex);
+  const boundaries = layerBoundaries(proto);
 
   return (
     <div className="boot">
@@ -220,14 +228,37 @@ export function PacketEditor() {
               ) : rows.length === 0 ? (
                 <div className="text-faint text-[11px]">{t("editor.scopeEmpty")}</div>
               ) : (
-                rows.map((r) => (
-                  <div key={r.offset} className="grid grid-cols-[42px_1fr_130px] gap-3.5">
-                    <span className="text-faint">{r.offset}</span>
-                    <span className="text-txt tracking-[0.06em]">{r.bytes.join(" ")}</span>
-                    <span className="text-dim tracking-[0.12em]">{r.ascii}</span>
-                  </div>
-                ))
+                rows.map((r) => {
+                  const base = parseInt(r.offset, 16);
+                  return (
+                    <div key={r.offset} className="grid grid-cols-[42px_1fr_130px] gap-3.5">
+                      <span className="text-faint">{r.offset}</span>
+                      <span className="tracking-[0.06em]">
+                        {r.bytes.map((b, j) => {
+                          const kind = layerOf(boundaries, base + j);
+                          return (
+                            <span
+                              key={j}
+                              className={LAYER_COLOR[kind]}
+                              style={kind === "l4" ? { textShadow: "0 0 8px rgba(255,178,36,.45)" } : undefined}
+                            >
+                              {b}
+                              {j < r.bytes.length - 1 ? " " : ""}
+                            </span>
+                          );
+                        })}
+                      </span>
+                      <span className="text-dim tracking-[0.12em]">{r.ascii}</span>
+                    </div>
+                  );
+                })
               )}
+            </div>
+            <div className="flex gap-3 px-3.5 py-2 border-t border-line relative z-10 font-mono text-[9px] text-dim">
+              <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-violet inline-block" />ETH</span>
+              <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-cyan inline-block" />L3</span>
+              <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-amber inline-block" />L4</span>
+              <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-faint inline-block" />DATA</span>
             </div>
           </div>
 

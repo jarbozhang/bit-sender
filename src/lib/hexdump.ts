@@ -1,5 +1,7 @@
 // 把后端返回的连续 hex 串格式化为示波器面板用的行结构 + Wireshark 风格 dump 导入/导出。
 
+import type { ProtoKey } from "./protocols";
+
 export interface HexRow {
   offset: string;
   bytes: string[];
@@ -72,4 +74,34 @@ export function parseHexDump(text: string): string {
 /** 12 位 hex → 冒号分隔大写 MAC。 */
 export function macFromHex(h: string): string {
   return (h.match(/.{2}/g) ?? []).join(":").toUpperCase();
+}
+
+// ── hex scope 分层着色 ──────────────────────────────────────────────
+// 各协议固定头长的层边界（end = 该层结束的字节偏移）。用户改 IHL/data_offset 时
+// 着色会略偏（少数情况），视觉近似即可。
+
+export type LayerKind = "eth" | "ip" | "l4" | "payload";
+
+export function layerBoundaries(proto: ProtoKey): { kind: LayerKind; end: number }[] {
+  switch (proto) {
+    case "ethernet":
+      return [{ kind: "eth", end: 14 }];
+    case "arp":
+      return [{ kind: "eth", end: 14 }, { kind: "l4", end: 42 }];
+    case "ipv4":
+      return [{ kind: "eth", end: 14 }, { kind: "ip", end: 34 }];
+    case "ipv6":
+      return [{ kind: "eth", end: 14 }, { kind: "ip", end: 54 }];
+    case "tcp":
+      return [{ kind: "eth", end: 14 }, { kind: "ip", end: 34 }, { kind: "l4", end: 54 }];
+    case "udp":
+    case "icmp":
+      return [{ kind: "eth", end: 14 }, { kind: "ip", end: 34 }, { kind: "l4", end: 42 }];
+  }
+}
+
+/** 给定层边界，返回第 byteIndex 个字节所属的层。超出最后边界即 payload。 */
+export function layerOf(bounds: { kind: LayerKind; end: number }[], byteIndex: number): LayerKind {
+  for (const b of bounds) if (byteIndex < b.end) return b.kind;
+  return "payload";
 }
