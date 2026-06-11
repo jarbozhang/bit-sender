@@ -1,27 +1,30 @@
 /** @type {import('tailwindcss').Config} */
+// 颜色用 CSS 变量（RGB 分量）+ <alpha-value>，使 bg-amber/10 等 alpha 修饰符在
+// 暗/亮主题下都有效。变量值见 src/styles.css（:root 暗色 / html.light 亮色）。
+const c = (v) => `rgb(var(${v}) / <alpha-value>)`;
+
 module.exports = {
   content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // 工业信号控制台配色（深色优先）
-        void: "#05080a",
-        bg: "#090f12",
-        panel: "#0d141a",
-        "panel-2": "#0f1820",
-        elevated: "#142029",
-        line: "#1b2a33",
-        "line-bright": "#294049",
-        txt: "#dde8ed",
-        dim: "#7e919c",
-        faint: "#4a5a64",
-        amber: "#ffb224",
-        "amber-dim": "#b87d18",
-        cyan: "#36e0cf",
-        signalgreen: "#46d483",
-        signalred: "#ff5d6c",
-        violet: "#8b7dff",
+        void: c("--void"),
+        bg: c("--bg"),
+        panel: c("--panel"),
+        "panel-2": c("--panel-2"),
+        elevated: c("--elevated"),
+        line: c("--line"),
+        "line-bright": c("--line-bright"),
+        txt: c("--txt"),
+        dim: c("--dim"),
+        faint: c("--faint"),
+        amber: c("--amber"),
+        "amber-dim": c("--amber-dim"),
+        cyan: c("--cyan"),
+        signalgreen: c("--signalgreen"),
+        signalred: c("--signalred"),
+        violet: c("--violet"),
       },
       fontFamily: {
         display: ['"Chakra Petch"', "sans-serif"],

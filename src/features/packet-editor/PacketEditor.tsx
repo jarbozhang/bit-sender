@@ -209,7 +209,7 @@ export function PacketEditor() {
 
         {/* 示波器 + 控制台 */}
         <div className="flex flex-col gap-3.5 xl:sticky xl:top-0">
-          <div className="scanlines border border-line-bright rounded overflow-hidden" style={{ background: "linear-gradient(180deg,#08110f,#060c0c)", boxShadow: "inset 0 0 60px -20px rgba(54,224,207,.18)" }}>
+          <div className="scanlines border border-line-bright rounded overflow-hidden" style={{ background: "linear-gradient(180deg, rgb(var(--panel-2)), rgb(var(--bg)))", boxShadow: "inset 0 0 60px -20px rgba(54,224,207,.18)" }}>
             <header className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line relative z-10">
               <span className="font-display text-[11px] tracking-[0.16em] text-cyan" style={{ textShadow: "0 0 10px rgba(54,224,207,.35)" }}>{t("editor.scope")}</span>
               <span className="ml-auto font-mono text-[10px] text-dim">{t("editor.scopeLen")} <b className="text-cyan">{byteLength(previewHex)}</b> B</span>

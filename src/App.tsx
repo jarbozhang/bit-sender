@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NetworkProvider, useNetwork } from "./contexts/network";
 import { EditorProvider } from "./contexts/editor";
 import { I18nProvider, useI18n } from "./contexts/i18n";
+import { ThemeProvider, useTheme } from "./contexts/theme";
 import { PacketEditor } from "./features/packet-editor/PacketEditor";
 import { SnifferView } from "./features/sniffer/SnifferView";
 import { TemplateLibrary } from "./features/templates/TemplateLibrary";
@@ -60,6 +61,7 @@ function NicPicker() {
 function Shell() {
   const [view, setView] = useState<ViewId>("editor");
   const { t, lang, setLang } = useI18n();
+  const { theme, toggle } = useTheme();
 
   return (
     <div className="h-screen grid grid-rows-[52px_1fr_26px] text-txt">
@@ -73,7 +75,7 @@ function Shell() {
         </div>
         <NicPicker />
         <div className="ml-auto flex items-center gap-1.5">
-          <button className="w-8 h-8 grid place-items-center text-amber border border-transparent rounded" title={t("statusbar.theme")}>◐</button>
+          <button onClick={toggle} className="w-8 h-8 grid place-items-center text-amber hover:bg-elevated border border-transparent rounded transition" title={t("statusbar.theme")}>{theme === "dark" ? "◐" : "☀"}</button>
           <button
             onClick={() => setLang(lang === "zh-CN" ? "en-US" : "zh-CN")}
             className="w-8 h-8 grid place-items-center font-mono text-[11px] text-dim hover:text-amber hover:border-line-bright hover:bg-elevated border border-transparent rounded transition"
@@ -129,12 +131,14 @@ function Shell() {
 
 export default function App() {
   return (
-    <I18nProvider>
-      <NetworkProvider>
-        <EditorProvider>
-          <Shell />
-        </EditorProvider>
-      </NetworkProvider>
-    </I18nProvider>
+    <ThemeProvider>
+      <I18nProvider>
+        <NetworkProvider>
+          <EditorProvider>
+            <Shell />
+          </EditorProvider>
+        </NetworkProvider>
+      </I18nProvider>
+    </ThemeProvider>
   );
 }

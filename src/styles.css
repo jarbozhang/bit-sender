@@ -2,8 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── 暗色（默认）── */
 :root {
+  --void: 5 8 10;
+  --bg: 9 15 18;
+  --panel: 13 20 26;
+  --panel-2: 15 24 32;
+  --elevated: 20 32 41;
+  --line: 27 42 51;
+  --line-bright: 41 64 73;
+  --txt: 221 232 237;
+  --dim: 126 145 156;
+  --faint: 74 90 100;
+  --amber: 255 178 36;
+  --amber-dim: 184 125 24;
+  --cyan: 54 224 207;
+  --signalgreen: 70 212 131;
+  --signalred: 255 93 108;
+  --violet: 139 125 255;
+  --grid: 27 42 51;
+  --noise-opacity: 0.035;
   color-scheme: dark;
+}
+
+/* ── 亮色 ── */
+html.light {
+  --void: 233 237 242;
+  --bg: 244 247 250;
+  --panel: 255 255 255;
+  --panel-2: 248 250 252;
+  --elevated: 236 240 245;
+  --line: 213 221 230;
+  --line-bright: 176 188 201;
+  --txt: 23 32 45;
+  --dim: 84 100 115;
+  --faint: 140 156 171;
+  --amber: 176 110 0;
+  --amber-dim: 205 142 26;
+  --cyan: 11 124 112;
+  --signalgreen: 20 140 80;
+  --signalred: 205 48 64;
+  --violet: 92 78 214;
+  --grid: 180 192 205;
+  --noise-opacity: 0.015;
+  color-scheme: light;
 }
 
 html,
@@ -14,13 +56,13 @@ body,
 
 body {
   margin: 0;
-  background-color: #05080a;
-  color: #dde8ed;
+  background-color: rgb(var(--void));
+  color: rgb(var(--txt));
   font-family: "IBM Plex Sans", sans-serif;
   /* 控制台氛围：顶部琥珀微光 + 底部青光 */
   background-image:
-    radial-gradient(900px 500px at 78% -8%, rgba(255, 178, 36, 0.07), transparent 60%),
-    radial-gradient(1100px 700px at 12% 110%, rgba(54, 224, 207, 0.06), transparent 55%);
+    radial-gradient(900px 500px at 78% -8%, rgb(var(--amber) / 0.07), transparent 60%),
+    radial-gradient(1100px 700px at 12% 110%, rgb(var(--cyan) / 0.06), transparent 55%);
   background-attachment: fixed;
   overflow: hidden;
 }
@@ -33,8 +75,8 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(27, 42, 51, 0.45) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(27, 42, 51, 0.45) 1px, transparent 1px);
+    linear-gradient(rgb(var(--grid) / 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--grid) / 0.45) 1px, transparent 1px);
   background-size: 56px 56px;
 }
 
@@ -45,7 +87,7 @@ body::after {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: var(--noise-opacity);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -59,9 +101,9 @@ body::after {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #294049;
+  background: rgb(var(--line-bright));
   border-radius: 10px;
-  border: 3px solid #090f12;
+  border: 3px solid rgb(var(--bg));
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -93,7 +135,7 @@ body::after {
   animation: pulse 2.4s ease-in-out infinite;
 }
 
-/* 示波器扫描线 */
+/* 示波器扫描线（随主题深浅） */
 .scanlines {
   position: relative;
 }
@@ -105,7 +147,7 @@ body::after {
   background: repeating-linear-gradient(
     0deg,
     transparent 0 2px,
-    rgba(0, 0, 0, 0.22) 2px 4px
+    rgb(var(--void) / 0.35) 2px 4px
   );
   opacity: 0.5;
 }

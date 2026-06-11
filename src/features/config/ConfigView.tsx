@@ -1,8 +1,10 @@
 import { useI18n } from "../../contexts/i18n";
+import { useTheme } from "../../contexts/theme";
 
 // 配置 / 设置视图。少量文案直接按 lang 内联双语（不必进 i18n 字典）。
 export function ConfigView() {
   const { lang, setLang } = useI18n();
+  const { theme, setTheme } = useTheme();
   const L = lang === "zh-CN";
 
   const card = "bg-gradient-to-b from-panel-2 to-panel border border-line rounded p-4";
@@ -38,7 +40,10 @@ export function ConfigView() {
         {/* 主题 */}
         <div className={`${card} flex items-center justify-between`}>
           <span className="text-sm text-txt">{L ? "主题" : "Theme"}</span>
-          <span className="font-mono text-[12px] text-amber">◐ {L ? "深色 · 信号控制台" : "Dark · signal console"}</span>
+          <div className="flex gap-1.5">
+            <button onClick={() => setTheme("dark")} className={`font-mono text-[12px] px-3 py-1.5 rounded border transition ${theme === "dark" ? "text-amber border-amber-dim bg-amber/10" : "text-dim border-line-bright hover:text-txt"}`}>◐ {L ? "深色" : "Dark"}</button>
+            <button onClick={() => setTheme("light")} className={`font-mono text-[12px] px-3 py-1.5 rounded border transition ${theme === "light" ? "text-amber border-amber-dim bg-amber/10" : "text-dim border-line-bright hover:text-txt"}`}>☀ {L ? "浅色" : "Light"}</button>
+          </div>
         </div>
 
         {/* 版本 */}
