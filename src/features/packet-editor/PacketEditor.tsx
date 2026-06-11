@@ -171,7 +171,8 @@ export function PacketEditor() {
         <div className="flex flex-col gap-3.5">
           {groups.map(([g, fields]) => {
             const flags = fields.filter((f) => f.kind === "flag");
-            const normal = fields.filter((f) => f.kind !== "flag");
+            const wide = fields.filter((f) => f.kind === "hex"); // payload：长 hex，整行多行编辑
+            const normal = fields.filter((f) => f.kind !== "flag" && f.kind !== "hex");
             return (
               <div key={g} className="bg-gradient-to-b from-panel-2 to-panel border border-line rounded overflow-hidden">
                 <header className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line bg-elevated/60">
@@ -200,6 +201,19 @@ export function PacketEditor() {
                     ))}
                   </div>
                 )}
+                {wide.map((f) => (
+                  <div key={f.key} className={`bg-panel px-3.5 py-2.5 flex flex-col gap-1 ${normal.length > 0 ? "border-t border-line" : ""}`}>
+                    <label className="text-[10px] tracking-wide uppercase text-dim">{t(`field.${f.key}`)}</label>
+                    <textarea
+                      value={String(values[f.key] ?? "")}
+                      onChange={(e) => setValue(f.key, e.target.value)}
+                      placeholder={f.placeholder}
+                      spellCheck={false}
+                      rows={3}
+                      className="font-mono text-[13px] font-medium text-txt bg-bg border border-line-bright rounded px-2.5 py-1.5 outline-none focus:border-amber focus:shadow-glow-amber transition w-full resize-y"
+                    />
+                  </div>
+                ))}
                 {flags.length > 0 && (
                   <div className="flex gap-1.5 flex-wrap px-3.5 py-2.5 border-t border-line">
                     <span className="text-[10px] text-dim uppercase tracking-wide self-center mr-1">{t("editor.flags")}</span>
