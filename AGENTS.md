@@ -1,6 +1,6 @@
-# AGENTS.md
+# CLAUDE.md
 
-This file provides guidance to Codex (and other coding agents) when working with code in this repository. It mirrors CLAUDE.md (which is gitignored).
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -16,7 +16,8 @@ pnpm tauri dev             # full dev (Vite + Tauri; needs Rust + sudo for pcap 
 pnpm dev                   # frontend only, port 1420 (strictPort)
 pnpm tauri build           # release bundle → src-tauri/target/release/bundle/
 pnpm typecheck             # tsc --noEmit (v2 is TypeScript)
-pnpm test                  # vitest (frontend unit tests)
+pnpm test                  # vitest (frontend unit tests; excludes e2e/)
+pnpm test:e2e              # playwright e2e (mock Tauri IPC; first run: pnpm exec playwright install chromium)
 cd src-tauri && cargo test # Rust tests; regenerates src/api/bindings.ts via the specta_export test
 cd src-tauri && cargo clippy --all-targets -- -D warnings
 ```
@@ -40,7 +41,7 @@ Rust defines a strongly-typed `PacketSpec` (enum with serde `tag = "kind"`). `ta
 React 18 + TypeScript + Tailwind 3 (`darkMode: 'class'`), Vite 6. Provider chain in `App.tsx`: `I18nProvider → NetworkProvider → EditorProvider → Shell`. View routing is `useState` in `Shell` (left icon rail, no router).
 - `features/{packet-editor, sniffer, sequence, monitor, templates}/` — one view each.
 - `lib/api.ts` — typed facade over the generated `commands` (unwraps tauri-specta `Result`).
-- `lib/protocols.ts` — frontend field metadata + `buildSpec(proto, values) → PacketSpec` (type-safe constructor).
+- `lib/protocols.ts` — frontend field metadata + `buildSpec(proto, values) → PacketSpec` (type-safe constructor; the return type makes TS enforce each variant's fields).
 - `lib/hexdump.ts`, `lib/templates.ts` (localStorage), `lib/i18n.ts` (zh/en dict).
 - `contexts/{network, editor, i18n}.tsx`.
 - `api/bindings.ts` — **generated; never hand-edit** (run `cargo test` to regenerate).
@@ -60,4 +61,6 @@ Industrial-signal-console aesthetic (dark; Chakra Petch + IBM Plex Mono/Sans; am
 - CI clippy gate is `-D warnings` (v2 is clean); `cargo build` must stay warning-free.
 - esbuild build gate is handled by `pnpm-workspace.yaml` `allowBuilds: { esbuild: true }` + `.npmrc` `verify-deps-before-run=false`.
 - localStorage keys: `bitsender-v2-templates`, `bitsender-v2-lang`, `bitSender-theme`.
+- CLAUDE.md is gitignored; AGENTS.md (untracked) mirrors it for Codex.
 - Plan & progress: `docs/REWRITE_PLAN.md` (milestones M0–M8 all complete).
+```

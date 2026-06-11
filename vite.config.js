@@ -11,6 +11,7 @@ export default defineConfig(async () => ({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test-setup.js"],
+    exclude: ["e2e/**", "node_modules/**"], // e2e 归 playwright（pnpm test:e2e）
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

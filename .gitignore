@@ -33,3 +33,5 @@ CLAUDE.md
 
 # Playwright MCP screenshot/snapshot artifacts
 .playwright-mcp/
+test-results/
+playwright-report/
