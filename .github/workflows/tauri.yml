@@ -58,7 +58,7 @@ jobs:
       - name: Install dependencies (pnpm)
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11
       - run: pnpm install --no-frozen-lockfile
 
       - name: Install Tauri CLI
