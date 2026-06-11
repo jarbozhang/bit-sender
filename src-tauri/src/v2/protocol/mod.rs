@@ -125,7 +125,7 @@ pub(crate) fn parse_hex(s: &str) -> Result<Vec<u8>, BuildError> {
     if cleaned.is_empty() {
         return Ok(Vec::new());
     }
-    if cleaned.len() % 2 != 0 || !cleaned.chars().all(|c| c.is_ascii_hexdigit()) {
+    if !cleaned.len().is_multiple_of(2) || !cleaned.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(BuildError::InvalidHex(s.to_string()));
     }
     (0..cleaned.len())

@@ -337,6 +337,8 @@ fn ts_secs(ts: &libc::timeval) -> u64 {
 /// pcap 包头 timeval → UNIX 毫秒。
 fn ts_millis(ts: &libc::timeval) -> u64 {
     let secs = ts.tv_sec.max(0) as u64;
+    // tv_usec 在 macOS 为 i32、Linux 为 i64：Linux 上此转换"多余"但 macOS 必需
+    #[allow(clippy::unnecessary_cast)]
     let usecs = (ts.tv_usec as i64).max(0) as u64;
     secs * 1000 + usecs / 1000
 }
