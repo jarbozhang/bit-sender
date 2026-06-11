@@ -191,6 +191,13 @@ export function PacketEditor() {
                         />
                       </div>
                     ))}
+                    {/* 行尾补齐：空位与面板同色，避免露出 bg-line 灰块（2/3 列断点各自补） */}
+                    {Array.from({ length: (3 - (normal.length % 3)) % 3 }, (_, i) => (
+                      <div key={`f3-${i}`} className="hidden lg:block bg-panel" />
+                    ))}
+                    {Array.from({ length: normal.length % 2 }, (_, i) => (
+                      <div key={`f2-${i}`} className="bg-panel lg:hidden" />
+                    ))}
                   </div>
                 )}
                 {flags.length > 0 && (
