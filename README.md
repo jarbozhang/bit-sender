@@ -13,7 +13,7 @@ Build raw L2 frames field by field, fire them at line rate, and sniff the wire b
 
 [中文文档](./README.zh-CN.md) · [Download](../../releases/latest) · [The rewrite story](./docs/blog/rewriting-bitsender-with-claude.md)
 
-<img src="./docs/design/preview.png" alt="BitSender packet editor with live layer-colored hex scope" width="860">
+<img src="./docs/demo.gif" alt="BitSender: live layer-colored hex scope, protocol switching, and dark/light themes" width="860">
 
 </div>
 
@@ -32,7 +32,7 @@ BitSender does both, with a GUI, on all three platforms:
 - **Sequences and response monitoring** — fire ordered, timed packet sequences, or send ICMP/ARP probes and measure RTT.
 - **Templates, dark/light theme, English/中文** — all persisted.
 
-> The packet editor's hex scope colors every byte by layer, live as you edit. Animated demo coming soon — for now, the shot above is the dark theme dashboard.
+> Above: the packet editor's hex scope colors every byte by protocol layer, live as you edit, plus protocol switching and dark/light themes.
 
 ## Install
 
