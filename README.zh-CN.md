@@ -37,8 +37,8 @@ xattr -cr /Applications/BitSender.app
 
 ## 功能特性
 
-- **七种协议的强类型构建**：Ethernet II / ARP / IPv4 / IPv6 / TCP / UDP / ICMP，全部字段可编辑，真实校验和（RFC 1071 IP 校验和、TCP/UDP 伪首部校验和、RFC 768 UDP 全零回避）。
-- **报文编辑器**：右侧示波器风格实时 hex 预览，按协议层着色（以太头/网络层/传输层/载荷）；支持 Wireshark 风格 hex dump 的导入与导出。
+- **L2–L7 强类型构建**：Ethernet II / ARP / IPv4 / IPv6 / TCP / UDP / ICMP，并支持 HTTP/1.1 明文请求作为 TCP payload 构造；全部字段可编辑，真实校验和（RFC 1071 IP 校验和、TCP/UDP 伪首部校验和、RFC 768 UDP 全零回避）。
+- **报文编辑器**：右侧示波器风格实时 hex 预览，按协议层着色（以太头/网络层/传输层/应用层/载荷）；支持 Wireshark 风格 hex dump 的导入与导出。HTTP 仅构造 TCP payload 中的明文请求字节，不等同于完整 HTTP 客户端或 HTTPS/TLS。
 - **测试发送 / 批量发送**：单发验证后可批量；支持设定频率，按时长 / 包数 / 手动三种停止条件，原子预扣计数保证精确发送数。
 - **网口嗅探**：实时抓包列表 + 统计（pps 采用滑动窗口按“上一完整秒”计算，pcap 头时间戳，有界缓冲并显示丢弃数）。
 - **序列发送**：多步报文按既定延迟依次发出，支持循环；启动前全部预构建并校验。

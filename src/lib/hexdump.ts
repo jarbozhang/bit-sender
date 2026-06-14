@@ -80,7 +80,7 @@ export function macFromHex(h: string): string {
 // 各协议固定头长的层边界（end = 该层结束的字节偏移）。用户改 IHL/data_offset 时
 // 着色会略偏（少数情况），视觉近似即可。
 
-export type LayerKind = "eth" | "ip" | "l4" | "payload";
+export type LayerKind = "eth" | "ip" | "l4" | "app" | "payload";
 
 export function layerBoundaries(proto: ProtoKey): { kind: LayerKind; end: number }[] {
   switch (proto) {
@@ -94,6 +94,8 @@ export function layerBoundaries(proto: ProtoKey): { kind: LayerKind; end: number
       return [{ kind: "eth", end: 14 }, { kind: "ip", end: 54 }];
     case "tcp":
       return [{ kind: "eth", end: 14 }, { kind: "ip", end: 34 }, { kind: "l4", end: 54 }];
+    case "http":
+      return [{ kind: "eth", end: 14 }, { kind: "ip", end: 34 }, { kind: "l4", end: 54 }, { kind: "app", end: Number.POSITIVE_INFINITY }];
     case "udp":
     case "icmp":
       return [{ kind: "eth", end: 14 }, { kind: "ip", end: 34 }, { kind: "l4", end: 42 }];

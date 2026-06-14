@@ -13,6 +13,16 @@ export const TCP_FRAME =
   "D431005000000000000000005002200000000000" + // tcp
   "48656C6C6F2C42495421"; // "Hello,BIT!"
 
+const HTTP_PAYLOAD = "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n";
+export const HTTP_FRAME =
+  "FFFFFFFFFFFF0011223344550800" + // eth
+  "450000700000400040060000C0A80164C0A80101" + // ipv4
+  "D431005000000001000000015018200000000000" + // tcp ACK+PSH
+  Array.from(new TextEncoder().encode(HTTP_PAYLOAD))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+
 export const MOCK_NIC = {
   name: "en0",
   description: "Wi-Fi (en0)",
@@ -22,7 +32,7 @@ export const MOCK_NIC = {
 
 export async function installTauriMock(page: Page): Promise<void> {
   await page.addInitScript(
-    ({ tcpFrame, nic }) => {
+    ({ tcpFrame, httpFrame, nic }) => {
       // 固定主题/语言，让断言确定。init script 在 reload 时也会执行，
       // 只补缺省、不覆盖，否则会破坏"设置持久化"类断言。
       if (!localStorage.getItem("bitSender-theme")) localStorage.setItem("bitSender-theme", "dark");
@@ -30,12 +40,13 @@ export async function installTauriMock(page: Page): Promise<void> {
 
       const handlers: Record<string, (args: any) => unknown> = {
         list_interfaces_v2: () => [nic],
-        build_packet_preview_v2: () => tcpFrame,
+        build_packet_preview_v2: (args: any) => args?.spec?.kind === "http" ? (window as any).__HTTP_FRAME__ : tcpFrame,
         send_packet_v2: (args: any) => ({ bytes: 64, interface: args.interfaceName }),
         "plugin:event|listen": () => 0,
         "plugin:event|unlisten": () => null,
       };
 
+      (window as any).__HTTP_FRAME__ = httpFrame;
       (window as any).__TAURI_INTERNALS__ = {
         invoke: (cmd: string, args: any) => {
           const h = handlers[cmd];
@@ -45,6 +56,6 @@ export async function installTauriMock(page: Page): Promise<void> {
         transformCallback: (cb: unknown) => cb,
       };
     },
-    { tcpFrame: TCP_FRAME, nic: MOCK_NIC },
+    { tcpFrame: TCP_FRAME, httpFrame: HTTP_FRAME, nic: MOCK_NIC },
   );
 }

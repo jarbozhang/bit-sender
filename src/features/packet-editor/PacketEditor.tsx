@@ -22,6 +22,7 @@ const LAYER_COLOR: Record<LayerKind, string> = {
   eth: "text-violet",
   ip: "text-cyan",
   l4: "text-amber",
+  app: "text-signalgreen",
   payload: "text-faint",
 };
 
@@ -171,8 +172,8 @@ export function PacketEditor() {
         <div className="flex flex-col gap-3.5">
           {groups.map(([g, fields]) => {
             const flags = fields.filter((f) => f.kind === "flag");
-            const wide = fields.filter((f) => f.kind === "hex"); // payload：长 hex，整行多行编辑
-            const normal = fields.filter((f) => f.kind !== "flag" && f.kind !== "hex");
+            const wide = fields.filter((f) => f.kind === "hex" || f.kind === "textarea"); // payload / 长应用层文本：整行多行编辑
+            const normal = fields.filter((f) => f.kind !== "flag" && f.kind !== "hex" && f.kind !== "textarea");
             return (
               <div key={g} className="bg-gradient-to-b from-panel-2 to-panel border border-line rounded overflow-hidden">
                 <header className="flex items-center gap-2.5 px-3.5 py-2.5 border-b border-line bg-elevated/60">
@@ -279,6 +280,7 @@ export function PacketEditor() {
               <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-violet inline-block" />ETH</span>
               <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-cyan inline-block" />L3</span>
               <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-amber inline-block" />L4</span>
+              <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-signalgreen inline-block" />APP</span>
               <span className="flex items-center gap-1.5"><i className="w-2 h-2 rounded-sm bg-faint inline-block" />DATA</span>
             </div>
           </div>
