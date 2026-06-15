@@ -4,7 +4,7 @@ import type { PacketSpec } from "../api/bindings";
 // 字段命名与后端 spec 完全一致（单一事实来源由 bindings.ts 保证，buildSpec 返回 PacketSpec
 // 时若漏填/错填字段，TS 编译即失败）。
 
-export type ProtoKey = "ethernet" | "arp" | "ipv4" | "ipv6" | "tcp" | "http" | "udp" | "icmp";
+export type ProtoKey = "ethernet" | "arp" | "ipv4" | "ipv6" | "icmp" | "tcp" | "udp" | "http";
 
 /** 字段种类，决定输入校验与构造时的转换。 */
 export type FieldKind =
@@ -121,6 +121,20 @@ export const PROTOCOLS: ProtoDef[] = [
     ],
   },
   {
+    key: "icmp",
+    label: "ICMP",
+    hint: "0x01",
+    fields: [
+      ...ETH,
+      ...IP_SUBSET,
+      { key: "icmp_type", label: "类型", kind: "dec", group: "l4", def: "8", placeholder: "8=Echo请求" },
+      { key: "icmp_code", label: "代码", kind: "dec", group: "l4", def: "0" },
+      { key: "rest_of_header", label: "其余头部", kind: "dec", group: "l4", def: "65537", placeholder: "Echo: id<<16|seq" },
+      { key: "checksum", label: "校验和", kind: "optdec", group: "l4", def: "", placeholder: "留空自动算" },
+      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
+    ],
+  },
+  {
     key: "tcp",
     label: "TCP",
     hint: "0x06",
@@ -141,6 +155,19 @@ export const PROTOCOLS: ProtoDef[] = [
       { key: "flag_rst", label: "RST", kind: "flag", group: "l4", def: false },
       { key: "flag_syn", label: "SYN", kind: "flag", group: "l4", def: true },
       { key: "flag_fin", label: "FIN", kind: "flag", group: "l4", def: false },
+      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
+    ],
+  },
+  {
+    key: "udp",
+    label: "UDP",
+    hint: "0x11",
+    fields: [
+      ...ETH,
+      ...IP_SUBSET,
+      { key: "src_port", label: "源端口", kind: "dec", group: "l4", def: "12345" },
+      { key: "dst_port", label: "目的端口", kind: "dec", group: "l4", def: "53" },
+      { key: "checksum", label: "校验和", kind: "optdec", group: "l4", def: "", placeholder: "留空自动算" },
       { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
     ],
   },
@@ -170,33 +197,6 @@ export const PROTOCOLS: ProtoDef[] = [
       { key: "path", label: "路径", kind: "text", group: "app", def: "/", placeholder: "/" },
       { key: "headers", label: "Headers", kind: "textarea", group: "app", def: "Connection: close", placeholder: "Header: value" },
       { key: "body", label: "Body", kind: "textarea", group: "app", def: "", placeholder: "optional request body" },
-    ],
-  },
-  {
-    key: "udp",
-    label: "UDP",
-    hint: "0x11",
-    fields: [
-      ...ETH,
-      ...IP_SUBSET,
-      { key: "src_port", label: "源端口", kind: "dec", group: "l4", def: "12345" },
-      { key: "dst_port", label: "目的端口", kind: "dec", group: "l4", def: "53" },
-      { key: "checksum", label: "校验和", kind: "optdec", group: "l4", def: "", placeholder: "留空自动算" },
-      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
-    ],
-  },
-  {
-    key: "icmp",
-    label: "ICMP",
-    hint: "0x01",
-    fields: [
-      ...ETH,
-      ...IP_SUBSET,
-      { key: "icmp_type", label: "类型", kind: "dec", group: "l4", def: "8", placeholder: "8=Echo请求" },
-      { key: "icmp_code", label: "代码", kind: "dec", group: "l4", def: "0" },
-      { key: "rest_of_header", label: "其余头部", kind: "dec", group: "l4", def: "65537", placeholder: "Echo: id<<16|seq" },
-      { key: "checksum", label: "校验和", kind: "optdec", group: "l4", def: "", placeholder: "留空自动算" },
-      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
     ],
   },
 ];
@@ -283,6 +283,21 @@ export function buildSpec(
         dst_ip: str("dst_ip"),
         payload_hex: str("payload_hex"),
       };
+    case "icmp":
+      return {
+        kind: "icmp",
+        dst_mac: str("dst_mac"),
+        src_mac: str("src_mac"),
+        ttl: dec("ttl"),
+        identification: dec("identification"),
+        src_ip: str("src_ip"),
+        dst_ip: str("dst_ip"),
+        icmp_type: dec("icmp_type"),
+        icmp_code: dec("icmp_code"),
+        checksum: optdec("checksum"),
+        rest_of_header: dec("rest_of_header"),
+        payload_hex: str("payload_hex"),
+      };
     case "tcp":
       return {
         kind: "tcp",
@@ -306,6 +321,20 @@ export function buildSpec(
         window_size: dec("window_size"),
         checksum: optdec("checksum"),
         urgent_pointer: dec("urgent_pointer"),
+        payload_hex: str("payload_hex"),
+      };
+    case "udp":
+      return {
+        kind: "udp",
+        dst_mac: str("dst_mac"),
+        src_mac: str("src_mac"),
+        ttl: dec("ttl"),
+        identification: dec("identification"),
+        src_ip: str("src_ip"),
+        dst_ip: str("dst_ip"),
+        src_port: dec("src_port"),
+        dst_port: dec("dst_port"),
+        checksum: optdec("checksum"),
         payload_hex: str("payload_hex"),
       };
     case "http":
@@ -336,35 +365,6 @@ export function buildSpec(
         path: str("path"),
         headers: str("headers"),
         body: str("body"),
-      };
-    case "udp":
-      return {
-        kind: "udp",
-        dst_mac: str("dst_mac"),
-        src_mac: str("src_mac"),
-        ttl: dec("ttl"),
-        identification: dec("identification"),
-        src_ip: str("src_ip"),
-        dst_ip: str("dst_ip"),
-        src_port: dec("src_port"),
-        dst_port: dec("dst_port"),
-        checksum: optdec("checksum"),
-        payload_hex: str("payload_hex"),
-      };
-    case "icmp":
-      return {
-        kind: "icmp",
-        dst_mac: str("dst_mac"),
-        src_mac: str("src_mac"),
-        ttl: dec("ttl"),
-        identification: dec("identification"),
-        src_ip: str("src_ip"),
-        dst_ip: str("dst_ip"),
-        icmp_type: dec("icmp_type"),
-        icmp_code: dec("icmp_code"),
-        checksum: optdec("checksum"),
-        rest_of_header: dec("rest_of_header"),
-        payload_hex: str("payload_hex"),
       };
   }
 }
