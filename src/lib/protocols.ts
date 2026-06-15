@@ -4,25 +4,28 @@ import type { PacketSpec } from "../api/bindings";
 // 字段命名与后端 spec 完全一致（单一事实来源由 bindings.ts 保证，buildSpec 返回 PacketSpec
 // 时若漏填/错填字段，TS 编译即失败）。
 
-export type ProtoKey = "ethernet" | "arp" | "ipv4" | "ipv6" | "tcp" | "udp" | "icmp";
+export type ProtoKey = "ethernet" | "arp" | "ipv4" | "ipv6" | "icmp" | "tcp" | "udp" | "http";
 
 /** 字段种类，决定输入校验与构造时的转换。 */
 export type FieldKind =
   | "mac" // MAC 地址字符串
   | "ip" // IPv4 字符串
   | "hex" // payload 十六进制串
+  | "text" // 应用层明文，单行文本
+  | "textarea" // 应用层明文，多行文本
   | "dec" // 十进制整数
   | "hexnum" // 十六进制整数（如 ether_type）
   | "flag" // 布尔（TCP flags）
   | "optdec"; // 可选十进制：空 → null（自动算，如校验和）
 
-export type GroupKey = "eth" | "ip" | "ip6" | "l4" | "arp" | "payload";
+export type GroupKey = "eth" | "ip" | "ip6" | "l4" | "app" | "arp" | "payload";
 
 export const GROUPS: Record<GroupKey, { tag: string; accent: string }> = {
   eth: { tag: "ETHERNET II", accent: "text-violet" },
   ip: { tag: "INTERNET PROTOCOL V4", accent: "text-cyan" },
   ip6: { tag: "INTERNET PROTOCOL V6", accent: "text-cyan" },
   l4: { tag: "TRANSPORT", accent: "text-amber" },
+  app: { tag: "APPLICATION", accent: "text-signalgreen" },
   arp: { tag: "ADDRESS RESOLUTION", accent: "text-amber" },
   payload: { tag: "PAYLOAD", accent: "text-dim" },
 };
@@ -118,6 +121,20 @@ export const PROTOCOLS: ProtoDef[] = [
     ],
   },
   {
+    key: "icmp",
+    label: "ICMP",
+    hint: "0x01",
+    fields: [
+      ...ETH,
+      ...IP_SUBSET,
+      { key: "icmp_type", label: "类型", kind: "dec", group: "l4", def: "8", placeholder: "8=Echo请求" },
+      { key: "icmp_code", label: "代码", kind: "dec", group: "l4", def: "0" },
+      { key: "rest_of_header", label: "其余头部", kind: "dec", group: "l4", def: "65537", placeholder: "Echo: id<<16|seq" },
+      { key: "checksum", label: "校验和", kind: "optdec", group: "l4", def: "", placeholder: "留空自动算" },
+      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
+    ],
+  },
+  {
     key: "tcp",
     label: "TCP",
     hint: "0x06",
@@ -155,17 +172,31 @@ export const PROTOCOLS: ProtoDef[] = [
     ],
   },
   {
-    key: "icmp",
-    label: "ICMP",
-    hint: "0x01",
+    key: "http",
+    label: "HTTP",
+    hint: "L7",
     fields: [
       ...ETH,
       ...IP_SUBSET,
-      { key: "icmp_type", label: "类型", kind: "dec", group: "l4", def: "8", placeholder: "8=Echo请求" },
-      { key: "icmp_code", label: "代码", kind: "dec", group: "l4", def: "0" },
-      { key: "rest_of_header", label: "其余头部", kind: "dec", group: "l4", def: "65537", placeholder: "Echo: id<<16|seq" },
+      { key: "src_port", label: "源端口", kind: "dec", group: "l4", def: "54321" },
+      { key: "dst_port", label: "目的端口", kind: "dec", group: "l4", def: "80" },
+      { key: "seq", label: "序列号", kind: "dec", group: "l4", def: "1" },
+      { key: "ack", label: "确认号", kind: "dec", group: "l4", def: "1" },
+      { key: "data_offset", label: "数据偏移", kind: "dec", group: "l4", def: "5" },
+      { key: "window_size", label: "窗口", kind: "dec", group: "l4", def: "8192" },
       { key: "checksum", label: "校验和", kind: "optdec", group: "l4", def: "", placeholder: "留空自动算" },
-      { key: "payload_hex", label: "Payload (hex)", kind: "hex", group: "payload", def: "" },
+      { key: "urgent_pointer", label: "紧急指针", kind: "dec", group: "l4", def: "0" },
+      { key: "flag_urg", label: "URG", kind: "flag", group: "l4", def: false },
+      { key: "flag_ack", label: "ACK", kind: "flag", group: "l4", def: true },
+      { key: "flag_psh", label: "PSH", kind: "flag", group: "l4", def: true },
+      { key: "flag_rst", label: "RST", kind: "flag", group: "l4", def: false },
+      { key: "flag_syn", label: "SYN", kind: "flag", group: "l4", def: false },
+      { key: "flag_fin", label: "FIN", kind: "flag", group: "l4", def: false },
+      { key: "method", label: "方法", kind: "text", group: "app", def: "GET", placeholder: "GET" },
+      { key: "host", label: "Host", kind: "text", group: "app", def: "example.com", placeholder: "example.com" },
+      { key: "path", label: "路径", kind: "text", group: "app", def: "/", placeholder: "/" },
+      { key: "headers", label: "Headers", kind: "textarea", group: "app", def: "Connection: close", placeholder: "Header: value" },
+      { key: "body", label: "Body", kind: "textarea", group: "app", def: "", placeholder: "optional request body" },
     ],
   },
 ];
@@ -252,6 +283,21 @@ export function buildSpec(
         dst_ip: str("dst_ip"),
         payload_hex: str("payload_hex"),
       };
+    case "icmp":
+      return {
+        kind: "icmp",
+        dst_mac: str("dst_mac"),
+        src_mac: str("src_mac"),
+        ttl: dec("ttl"),
+        identification: dec("identification"),
+        src_ip: str("src_ip"),
+        dst_ip: str("dst_ip"),
+        icmp_type: dec("icmp_type"),
+        icmp_code: dec("icmp_code"),
+        checksum: optdec("checksum"),
+        rest_of_header: dec("rest_of_header"),
+        payload_hex: str("payload_hex"),
+      };
     case "tcp":
       return {
         kind: "tcp",
@@ -291,20 +337,34 @@ export function buildSpec(
         checksum: optdec("checksum"),
         payload_hex: str("payload_hex"),
       };
-    case "icmp":
+    case "http":
       return {
-        kind: "icmp",
+        kind: "http",
         dst_mac: str("dst_mac"),
         src_mac: str("src_mac"),
         ttl: dec("ttl"),
         identification: dec("identification"),
         src_ip: str("src_ip"),
         dst_ip: str("dst_ip"),
-        icmp_type: dec("icmp_type"),
-        icmp_code: dec("icmp_code"),
+        src_port: dec("src_port"),
+        dst_port: dec("dst_port"),
+        seq: dec("seq"),
+        ack: dec("ack"),
+        data_offset: dec("data_offset"),
+        flag_urg: flag("flag_urg"),
+        flag_ack: flag("flag_ack"),
+        flag_psh: flag("flag_psh"),
+        flag_rst: flag("flag_rst"),
+        flag_syn: flag("flag_syn"),
+        flag_fin: flag("flag_fin"),
+        window_size: dec("window_size"),
         checksum: optdec("checksum"),
-        rest_of_header: dec("rest_of_header"),
-        payload_hex: str("payload_hex"),
+        urgent_pointer: dec("urgent_pointer"),
+        method: str("method"),
+        host: str("host"),
+        path: str("path"),
+        headers: str("headers"),
+        body: str("body"),
       };
   }
 }

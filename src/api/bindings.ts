@@ -208,6 +208,18 @@ timestamp_ms: number; protocol: string; src_mac: string; dst_mac: string; src_ip
  */
 export type EthernetSpec = { dst_mac: string; src_mac: string; ether_type: number; payload_hex: string }
 /**
+ * HTTP/1.1 请求帧规格。L2/L3/L4 字段与 TcpSpec 对齐，应用层字段负责生成 TCP payload。
+ */
+export type HttpSpec = { dst_mac: string; src_mac: string; ttl: number; identification: number; src_ip: string; dst_ip: string; src_port: number; dst_port: number; seq: number; ack: number; 
+/**
+ * 数据偏移（以 4 字节为单位），无选项时为 5。会被 TCP builder clamp 到 [5,15]。
+ */
+data_offset: number; flag_urg: boolean; flag_ack: boolean; flag_psh: boolean; flag_rst: boolean; flag_syn: boolean; flag_fin: boolean; window_size: number; checksum: number | null; urgent_pointer: number; method: string; host: string; path: string; 
+/**
+ * 每行一个 header，形如 `Name: value`。允许空行；换行会规范化为 CRLF。
+ */
+headers: string; body: string }
+/**
  * ICMP 帧规格。IPv4 层同 TcpSpec 用固定默认，仅暴露 ttl/identification。
  */
 export type IcmpSpec = { dst_mac: string; src_mac: string; ttl: number; identification: number; src_ip: string; dst_ip: string; icmp_type: number; icmp_code: number; checksum: number | null; 
@@ -255,7 +267,7 @@ export type MonitorStats = { total: number; success: number; timeout: number; av
  * 注意：标签用 `kind` 而非 `protocol`，因为 `Ipv4Spec` 已有名为 `protocol` 的
  * IP 协议号字段，撞名会让 TS 联合类型坍缩为 never。
  */
-export type PacketSpec = ({ kind: "ethernet" } & EthernetSpec) | ({ kind: "arp" } & ArpSpec) | ({ kind: "ipv4" } & Ipv4Spec) | ({ kind: "tcp" } & TcpSpec) | ({ kind: "udp" } & UdpSpec) | ({ kind: "icmp" } & IcmpSpec) | ({ kind: "ipv6" } & Ipv6Spec)
+export type PacketSpec = ({ kind: "ethernet" } & EthernetSpec) | ({ kind: "arp" } & ArpSpec) | ({ kind: "ipv4" } & Ipv4Spec) | ({ kind: "tcp" } & TcpSpec) | ({ kind: "http" } & HttpSpec) | ({ kind: "udp" } & UdpSpec) | ({ kind: "icmp" } & IcmpSpec) | ({ kind: "ipv6" } & Ipv6Spec)
 /**
  * 单发结果：发出的字节数 + 出口网卡名。
  */

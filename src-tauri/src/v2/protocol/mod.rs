@@ -7,6 +7,7 @@
 
 mod arp;
 mod ethernet;
+mod http;
 mod icmp;
 mod ipv4;
 mod ipv6;
@@ -15,6 +16,7 @@ mod udp;
 
 pub use arp::ArpSpec;
 pub use ethernet::{build_ethernet, EthernetSpec};
+pub use http::HttpSpec;
 pub use icmp::IcmpSpec;
 pub use ipv4::Ipv4Spec;
 pub use ipv6::Ipv6Spec;
@@ -34,6 +36,8 @@ pub enum BuildError {
     InvalidIp { field: String, value: String },
     #[error("payload 不是有效的十六进制: {0}")]
     InvalidHex(String),
+    #[error("HTTP 字段 {field} 无效: {reason}")]
+    InvalidHttpField { field: String, reason: String },
 }
 
 /// 最小以太网帧 60 字节（FCS 4 字节由网卡追加）。
@@ -58,6 +62,7 @@ pub enum PacketSpec {
     Arp(ArpSpec),
     Ipv4(Ipv4Spec),
     Tcp(TcpSpec),
+    Http(HttpSpec),
     Udp(UdpSpec),
     Icmp(IcmpSpec),
     Ipv6(Ipv6Spec),
@@ -71,6 +76,7 @@ impl PacketSpec {
             PacketSpec::Arp(s) => arp::build_arp(s),
             PacketSpec::Ipv4(s) => ipv4::build_ipv4(s),
             PacketSpec::Tcp(s) => tcp::build_tcp(s),
+            PacketSpec::Http(s) => http::build_http(s),
             PacketSpec::Udp(s) => udp::build_udp(s),
             PacketSpec::Icmp(s) => icmp::build_icmp(s),
             PacketSpec::Ipv6(s) => ipv6::build_ipv6(s),
@@ -258,6 +264,33 @@ mod dispatch_tests {
                 checksum: None,
                 urgent_pointer: 0,
                 payload_hex: String::new(),
+            }),
+            PacketSpec::Http(HttpSpec {
+                dst_mac: "FF:FF:FF:FF:FF:FF".into(),
+                src_mac: "00:11:22:33:44:55".into(),
+                ttl: 64,
+                identification: 0,
+                src_ip: "10.0.0.1".into(),
+                dst_ip: "10.0.0.2".into(),
+                src_port: 54321,
+                dst_port: 80,
+                seq: 1,
+                ack: 1,
+                data_offset: 5,
+                flag_urg: false,
+                flag_ack: true,
+                flag_psh: true,
+                flag_rst: false,
+                flag_syn: false,
+                flag_fin: false,
+                window_size: 8192,
+                checksum: None,
+                urgent_pointer: 0,
+                method: "GET".into(),
+                host: "example.com".into(),
+                path: "/".into(),
+                headers: "Connection: close".into(),
+                body: String::new(),
             }),
             PacketSpec::Udp(UdpSpec {
                 dst_mac: "FF:FF:FF:FF:FF:FF".into(),

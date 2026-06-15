@@ -45,6 +45,22 @@ export const DEFAULT_TEMPLATES: Template[] = [
     createdAt: "2026-01-01T00:00:00.000Z",
   },
   {
+    id: "def-http-get",
+    name: "HTTP GET · 明文请求",
+    description: "构造 HTTP/1.1 GET 请求（仅生成 TCP payload，不建立 TCP 会话）",
+    proto: "http",
+    values: tmpl("http", {
+      dst_port: "80",
+      method: "GET",
+      host: "example.com",
+      path: "/",
+      headers: "Connection: close",
+      body: "",
+    }),
+    tags: ["HTTP", "L7", "明文"],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  },
+  {
     id: "def-udp-dns",
     name: "UDP DNS 查询",
     description: "向 53 端口发送 DNS 查询（payload 为 example.com A 记录查询）",

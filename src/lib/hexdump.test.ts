@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toHexRows, byteLength, parseHexDump, generateHexDump, macFromHex } from "./hexdump";
+import { toHexRows, byteLength, parseHexDump, generateHexDump, macFromHex, layerBoundaries, layerOf } from "./hexdump";
 
 describe("toHexRows", () => {
   it("16 字节一行", () => {
@@ -50,5 +50,22 @@ describe("parseHexDump", () => {
 describe("macFromHex", () => {
   it("12 hex → 冒号大写 MAC", () => {
     expect(macFromHex("aabbccddeeff")).toBe("AA:BB:CC:DD:EE:FF");
+  });
+});
+
+
+describe("layerBoundaries", () => {
+  it("HTTP 将 TCP payload 标记为应用层", () => {
+    const bounds = layerBoundaries("http");
+    expect(layerOf(bounds, 0)).toBe("eth");
+    expect(layerOf(bounds, 14)).toBe("ip");
+    expect(layerOf(bounds, 34)).toBe("l4");
+    expect(layerOf(bounds, 54)).toBe("app");
+    expect(layerOf(bounds, 120)).toBe("app");
+  });
+
+  it("TCP 仍将头部之后标记为 payload", () => {
+    const bounds = layerBoundaries("tcp");
+    expect(layerOf(bounds, 54)).toBe("payload");
   });
 });

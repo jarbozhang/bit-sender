@@ -51,6 +51,23 @@ test("hex scope 按协议层着色（TCP 帧）", async ({ page }) => {
   await expect(page.getByText("Hello,BIT!")).toBeVisible();
 });
 
+
+test("HTTP tab renders Layer 7 fields and APP-colored payload", async ({ page }) => {
+  await page.getByRole("button", { name: /^HTTP/ }).click();
+  await expect(page.getByText("APPLICATION")).toBeVisible();
+  await expect(page.locator("input").nth(14)).toHaveValue("GET");
+  await expect(page.locator("input").nth(15)).toHaveValue("example.com");
+  await expect(page.locator("input").nth(16)).toHaveValue("/");
+  await expect(page.locator("textarea").first()).toHaveValue("Connection: close");
+
+  await expect(page.locator(".scanlines header b")).toHaveText("110");
+  await expect(page.locator(`${BYTE_CONTAINER} > span.text-violet`)).toHaveCount(14);
+  await expect(page.locator(`${BYTE_CONTAINER} > span.text-cyan`)).toHaveCount(20);
+  await expect(page.locator(`${BYTE_CONTAINER} > span.text-amber`)).toHaveCount(20);
+  await expect(page.locator(`${BYTE_CONTAINER} > span.text-signalgreen`)).toHaveCount(56);
+  await expect(page.getByText(/GET \/ HTTP/)).toBeVisible();
+});
+
 test("发送：未选网卡报错，选中后成功", async ({ page }) => {
   await gotoTcpTab(page);
   await page.getByRole("button", { name: "测试发送" }).click();

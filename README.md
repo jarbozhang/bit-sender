@@ -25,14 +25,14 @@ Most packet tools make you pick one job. Wireshark captures but won't craft. Sca
 
 BitSender does both, with a GUI, on all three platforms:
 
-- **Craft any L2 frame, field by field** — Ethernet II, ARP, IPv4, IPv6, TCP, UDP, ICMP. Real checksums (IP / TCP-UDP pseudo-header / ICMP, per RFC 1071 and 768), or set them yourself to forge malformed packets on purpose.
+- **Craft frames across L2–L7, field by field** — Ethernet II, ARP, IPv4, IPv6, TCP, UDP, ICMP, plus HTTP/1.1 cleartext request payloads over TCP. Real checksums (IP / TCP-UDP pseudo-header / ICMP, per RFC 1071 and 768), or set them yourself to forge malformed packets on purpose.
 - **Live hex scope** — every byte is colored by protocol layer as you type (Ethernet / IP / transport / payload). Import and export Wireshark-style hex dumps.
 - **Send one, or send a flood** — test-send a single frame, or batch at a set rate with exact stop conditions: count, duration, or manual.
 - **Sniff with honest stats** — packets-per-second is computed over the last *complete* second from pcap header timestamps, not a hand-wavy counter that drifts. (v1 couldn't count pps right. v2 can.)
 - **Sequences and response monitoring** — fire ordered, timed packet sequences, or send ICMP/ARP probes and measure RTT.
 - **Templates, dark/light theme, English/中文** — all persisted.
 
-> Above: the packet editor's hex scope colors every byte by protocol layer, live as you edit, plus protocol switching and dark/light themes.
+> Above: the packet editor's hex scope colors every byte by protocol layer, live as you edit, plus protocol switching and dark/light themes. HTTP support crafts raw HTTP/1.1 bytes inside a TCP payload; it is not a stateful HTTP client or HTTPS/TLS stack.
 
 ## Install
 

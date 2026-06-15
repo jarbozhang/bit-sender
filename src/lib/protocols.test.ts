@@ -31,6 +31,25 @@ describe("buildSpec", () => {
     const spec = buildSpec("tcp", { ...defaultValues("tcp"), dst_port: "443" });
     if (spec.kind === "tcp") expect(spec.dst_port).toBe(443);
   });
+
+  it("HTTP 字段保持明文字符串并带默认 ACK/PSH", () => {
+    const spec = buildSpec("http", {
+      ...defaultValues("http"),
+      method: "POST",
+      path: "/api",
+      headers: "Content-Type: text/plain",
+      body: "ping",
+    });
+    if (spec.kind === "http") {
+      expect(spec.method).toBe("POST");
+      expect(spec.path).toBe("/api");
+      expect(spec.headers).toBe("Content-Type: text/plain");
+      expect(spec.body).toBe("ping");
+      expect(spec.flag_ack).toBe(true);
+      expect(spec.flag_psh).toBe(true);
+      expect(spec.dst_port).toBe(80);
+    }
+  });
 });
 
 describe("defaultValues", () => {
