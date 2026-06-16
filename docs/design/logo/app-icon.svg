@@ -1,0 +1,79 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="badge" x1="160" y1="120" x2="864" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f1820"/><stop offset="0.55" stop-color="#0d141a"/><stop offset="1" stop-color="#070b0e"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="0.5" cy="0.46" r="0.74" gradientUnits="objectBoundingBox">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.5"/>
+    </radialGradient>
+    <radialGradient id="scope" cx="0.42" cy="0.5" r="0.6" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#ffb224" stop-opacity="0.1"/><stop offset="1" stop-color="#ffb224" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="58" height="58" patternUnits="userSpaceOnUse">
+      <path d="M58 0H0V58" fill="none" stroke="#36e0cf" stroke-opacity="0.05" stroke-width="1.4"/>
+    </pattern>
+    <linearGradient id="axis" x1="100" y1="0" x2="924" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#36e0cf" stop-opacity="0"/><stop offset="0.5" stop-color="#36e0cf" stop-opacity="0.3"/><stop offset="1" stop-color="#36e0cf" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="waveStroke" x1="180" y1="0" x2="724" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffb224"/><stop offset="1" stop-color="#ffce5c"/>
+    </linearGradient>
+    <filter id="gA" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="gC" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+    <clipPath id="clip"><rect x="64" y="64" width="896" height="896" rx="210"/></clipPath>
+  </defs>
+
+  <rect x="64" y="64" width="896" height="896" rx="210" fill="url(#badge)"/>
+  <g clip-path="url(#clip)">
+    <rect x="64" y="64" width="896" height="896" fill="url(#grid)"/>
+    <rect x="64" y="64" width="896" height="896" fill="url(#scope)"/>
+
+    <!-- 中心电压轴 + 刻度 -->
+    <line x1="120" y1="512" x2="904" y2="512" stroke="url(#axis)" stroke-width="2.5" stroke-dasharray="2 16"/>
+    <!-- 高/低电平参考虚线 -->
+    <line x1="150" y1="352" x2="754" y2="352" stroke="#ffb224" stroke-opacity="0.12" stroke-width="2" stroke-dasharray="3 12"/>
+    <line x1="150" y1="672" x2="754" y2="672" stroke="#ffb224" stroke-opacity="0.12" stroke-width="2" stroke-dasharray="3 12"/>
+
+    <!-- 起点发射指示 -->
+    <circle cx="180" cy="352" r="19" fill="#36e0cf" filter="url(#gC)"/>
+    <circle cx="180" cy="352" r="11" fill="#7af6e8"/>
+
+    <!-- 方波：外辉光 -->
+    <path d="M 180 352 L 288.8 352 L 288.8 672 L 397.6 672 L 397.6 352 L 506.4 352 L 615.2 352 L 615.2 672 L 724.0 672" stroke="#ffb224" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" fill="none" filter="url(#gA)" opacity="0.6"/>
+    <!-- 方波：主体 -->
+    <path d="M 180 352 L 288.8 352 L 288.8 672 L 397.6 672 L 397.6 352 L 506.4 352 L 615.2 352 L 615.2 672 L 724.0 672" stroke="url(#waveStroke)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- 方波：高光细芯 -->
+    <path d="M 180 352 L 288.8 352 L 288.8 672 L 397.6 672 L 397.6 352 L 506.4 352 L 615.2 352 L 615.2 672 L 724.0 672" stroke="#fff2d4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.5"/>
+
+    <!-- 采样节点 -->
+    <g>
+      <circle cx="288.8" cy="512.0" r="16" fill="#36e0cf" filter="url(#gC)"/><circle cx="288.8" cy="512.0" r="9" fill="#7af6e8"/>
+      <circle cx="397.6" cy="512.0" r="16" fill="#36e0cf" filter="url(#gC)"/><circle cx="397.6" cy="512.0" r="9" fill="#7af6e8"/>
+      <circle cx="615.2" cy="512.0" r="16" fill="#36e0cf" filter="url(#gC)"/><circle cx="615.2" cy="512.0" r="9" fill="#7af6e8"/>
+    </g>
+
+    <!-- 右端比特发射 -->
+    <g filter="url(#gA)" opacity="0.45">
+      <rect x="752.0" y="650.0" width="44" height="44" rx="9.7" fill="#ffc24a" opacity="0.95"/>
+      <rect x="837.5" y="645.5" width="33" height="33" rx="7.3" fill="#ffc24a" opacity="0.72"/>
+      <rect x="908.5" y="638.5" width="23" height="23" rx="5.1" fill="#ffc24a" opacity="0.5"/>
+      <rect x="965.0" y="629.0" width="14" height="14" rx="3.1" fill="#ffc24a" opacity="0.3"/>
+    </g>
+    <g>
+      <rect x="752.0" y="650.0" width="44" height="44" rx="9.7" fill="#ffc24a" opacity="0.95"/>
+      <rect x="837.5" y="645.5" width="33" height="33" rx="7.3" fill="#ffc24a" opacity="0.72"/>
+      <rect x="908.5" y="638.5" width="23" height="23" rx="5.1" fill="#ffc24a" opacity="0.5"/>
+      <rect x="965.0" y="629.0" width="14" height="14" rx="3.1" fill="#ffc24a" opacity="0.3"/>
+    </g>
+
+    <!-- 比特标签 -->
+    <g>
+      
+    </g>
+
+    <rect x="64" y="64" width="896" height="896" fill="url(#vignette)"/>
+  </g>
+
+  <rect x="64.5" y="64.5" width="895" height="895" rx="209.5" fill="none" stroke="#fff" stroke-opacity="0.07" stroke-width="1.5"/>
+  <rect x="71" y="71" width="882" height="882" rx="203" fill="none" stroke="#ffb224" stroke-opacity="0.14" stroke-width="2"/>
+</svg>
