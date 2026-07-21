@@ -14,6 +14,7 @@ import { toHexRows, byteLength, generateHexDump, parseHexDump, macFromHex, layer
 import { useNetwork } from "../../contexts/network";
 import { useEditor } from "../../contexts/editor";
 import { BatchDialog } from "./BatchDialog";
+import { HexField } from "./HexField";
 import { useI18n } from "../../contexts/i18n";
 
 type SendMsg = { kind: "ok" | "err" | "idle"; text: string };
@@ -205,14 +206,21 @@ export function PacketEditor() {
                 {wide.map((f) => (
                   <div key={f.key} className={`bg-panel px-3.5 py-2.5 flex flex-col gap-1 ${normal.length > 0 ? "border-t border-line" : ""}`}>
                     <label className="text-[10px] tracking-wide uppercase text-dim">{t(`field.${f.key}`)}</label>
-                    <textarea
-                      value={String(values[f.key] ?? "")}
-                      onChange={(e) => setValue(f.key, e.target.value)}
-                      placeholder={f.placeholder}
-                      spellCheck={false}
-                      rows={3}
-                      className="font-mono text-[13px] font-medium text-txt bg-bg border border-line-bright rounded px-2.5 py-1.5 outline-none focus:border-amber focus:shadow-glow-amber transition w-full resize-y"
-                    />
+                    {f.kind === "hex" ? (
+                      <HexField
+                        value={String(values[f.key] ?? "")}
+                        onChange={(v) => setValue(f.key, v)}
+                      />
+                    ) : (
+                      <textarea
+                        value={String(values[f.key] ?? "")}
+                        onChange={(e) => setValue(f.key, e.target.value)}
+                        placeholder={f.placeholder}
+                        spellCheck={false}
+                        rows={3}
+                        className="font-mono text-[13px] font-medium text-txt bg-bg border border-line-bright rounded px-2.5 py-1.5 outline-none focus:border-amber focus:shadow-glow-amber transition w-full resize-y"
+                      />
+                    )}
                   </div>
                 ))}
                 {flags.length > 0 && (
