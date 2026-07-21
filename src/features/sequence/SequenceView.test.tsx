@@ -1,3 +1,4 @@
+import { test, beforeEach, expect } from "vitest";
 import { useState } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { I18nProvider } from "../../contexts/i18n";
@@ -37,13 +38,13 @@ test("已添加的序列包在切换 tab（组件卸载重挂）后仍保留", (
   renderHarness();
 
   fireEvent.click(screen.getByText("+ 添加当前包"));
-  expect(screen.getByText("TCP")).toBeInTheDocument();
+  expect(screen.queryByText("TCP")).not.toBeNull();
 
   // 切走：卸载 SequenceView
   fireEvent.click(screen.getByText("toggle"));
-  expect(screen.queryByText("TCP")).not.toBeInTheDocument();
+  expect(screen.queryByText("TCP")).toBeNull();
 
   // 切回：重挂 SequenceView，包记录应仍在
   fireEvent.click(screen.getByText("toggle"));
-  expect(screen.getByText("TCP")).toBeInTheDocument();
+  expect(screen.queryByText("TCP")).not.toBeNull();
 });
