@@ -83,8 +83,10 @@ pub fn start_batch(
 ) -> Result<String, String> {
     let task_id = uuid::Uuid::new_v4().to_string();
     // 启动即验证：spec 可构建 + 网卡可打开，失败立即上报（修 v1 静默失败）。
+    // 只打开一个句柄，交所有 worker 共享——Windows/Npcap 下并发对同一网卡多次 open
+    // 会失败，且任一 worker open 失败会置 running=false 拖垮全部 worker（表现为无包无动画）。
     let bytes = Arc::new(spec.build().map_err(|e| e.to_string())?);
-    drop(PacketSender::open(&interface_name)?);
+    let sender = Arc::new(Mutex::new(PacketSender::open(&interface_name)?));
 
     let running = Arc::new(AtomicBool::new(true));
     let sent = Arc::new(AtomicU64::new(0));
@@ -127,15 +129,8 @@ pub fn start_batch(
         let sent = sent.clone();
         let attempts = attempts.clone();
         let bytes = bytes.clone();
-        let iface = interface_name.clone();
+        let sender = sender.clone();
         workers.push(std::thread::spawn(move || {
-            let mut sender = match PacketSender::open(&iface) {
-                Ok(s) => s,
-                Err(_) => {
-                    running.store(false, Ordering::Relaxed);
-                    return;
-                }
-            };
             let interval =
                 Duration::from_micros((1_000_000 * thread_count) / frequency.max(1) as u64);
             // 错峰：每个 worker 起始相位偏移，避免同时发。
@@ -165,7 +160,9 @@ pub fn start_batch(
                         break;
                     }
                 }
-                match sender.send(&bytes) {
+                // 锁在语句结束即释放，避免持锁 sleep 阻塞其它 worker。
+                let result = sender.lock().unwrap().send(&bytes);
+                match result {
                     Ok(_) => {
                         sent.fetch_add(1, Ordering::Relaxed);
                     }
