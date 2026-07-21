@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NetworkProvider, useNetwork } from "./contexts/network";
 import { EditorProvider } from "./contexts/editor";
+import { SequenceProvider } from "./contexts/sequence";
 import { I18nProvider, useI18n } from "./contexts/i18n";
 import { ThemeProvider, useTheme } from "./contexts/theme";
 import { PacketEditor } from "./features/packet-editor/PacketEditor";
@@ -135,7 +136,9 @@ export default function App() {
       <I18nProvider>
         <NetworkProvider>
           <EditorProvider>
-            <Shell />
+            <SequenceProvider>
+              <Shell />
+            </SequenceProvider>
           </EditorProvider>
         </NetworkProvider>
       </I18nProvider>

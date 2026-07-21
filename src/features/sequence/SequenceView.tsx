@@ -1,18 +1,10 @@
 import { useState } from "react";
 import { useEditor } from "../../contexts/editor";
-import { getProto, buildSpec, type ProtoKey } from "../../lib/protocols";
+import { getProto, buildSpec } from "../../lib/protocols";
 import { api, type SequenceStep } from "../../lib/api";
 import { useNetwork } from "../../contexts/network";
 import { useI18n } from "../../contexts/i18n";
-
-export interface SeqItem {
-  id: string;
-  name: string;
-  proto: ProtoKey;
-  values: Record<string, string | boolean>;
-  delayMs: number;
-  enabled: boolean;
-}
+import { useSequence, type SeqItem } from "../../contexts/sequence";
 
 let seqCounter = 0;
 
@@ -20,8 +12,7 @@ export function SequenceView() {
   const { proto, values } = useEditor();
   const { selected } = useNetwork();
   const { t } = useI18n();
-  const [seq, setSeq] = useState<SeqItem[]>([]);
-  const [loopCount, setLoopCount] = useState(1);
+  const { seq, setSeq, loopCount, setLoopCount } = useSequence();
   const [msg, setMsg] = useState<{ kind: "ok" | "err" | "idle"; text: string }>({ kind: "idle", text: t("footer.ready") });
 
   const addCurrent = () => {
