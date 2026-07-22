@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useEditor } from "../../contexts/editor";
 import { getProto, buildSpec } from "../../lib/protocols";
 import { api, type SequenceStep } from "../../lib/api";
@@ -14,6 +14,14 @@ export function SequenceView() {
   const { t } = useI18n();
   const { seq, setSeq, loopCount, setLoopCount } = useSequence();
   const [msg, setMsg] = useState<{ kind: "ok" | "err" | "idle"; text: string }>({ kind: "idle", text: t("footer.ready") });
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const timer = useRef<number | null>(null);
+  const lastSent = useRef(0);
+
+  // 组件卸载（切 tab）时清掉轮询定时器，避免泄漏与卸载后 setState。
+  useEffect(() => () => {
+    if (timer.current) window.clearInterval(timer.current);
+  }, []);
 
   const addCurrent = () => {
     seqCounter += 1;
@@ -48,10 +56,36 @@ export function SequenceView() {
         delay_ms: p.delayMs,
       }));
       const id = await api.startSequence(steps, selected.name, loopCount);
+      setTaskId(id);
+      lastSent.current = 0;
       setMsg({ kind: "ok", text: t("sequence.started", { id: id.slice(0, 8) }) });
+      // 轮询后端状态：显示进度，完成后给出提示（对齐批量发送的反馈）。
+      timer.current = window.setInterval(async () => {
+        const s = await api.sequenceStatus(id);
+        if (!s) return;
+        lastSent.current = s.total_sent;
+        if (s.completed || !s.running) {
+          if (timer.current) window.clearInterval(timer.current);
+          timer.current = null;
+          setTaskId(null);
+          setMsg({ kind: "ok", text: t("sequence.done", { sent: s.total_sent }) });
+        } else {
+          setMsg({ kind: "ok", text: t("sequence.running", { sent: s.total_sent, loop: s.current_loop + 1, loops: loopCount }) });
+        }
+      }, 300);
     } catch (e) {
       setMsg({ kind: "err", text: String(e) });
     }
+  };
+
+  const stop = async () => {
+    if (taskId) await api.stopSequence(taskId);
+    if (timer.current) {
+      window.clearInterval(timer.current);
+      timer.current = null;
+    }
+    setTaskId(null);
+    setMsg({ kind: "ok", text: t("sequence.done", { sent: lastSent.current }) });
   };
 
   return (
@@ -100,9 +134,15 @@ export function SequenceView() {
       <div className="flex items-center gap-3 mt-4 pt-4 border-t border-line">
         <span className="font-mono text-[11px] text-dim">{t("sequence.summary", { total: seq.length, enabled: enabled.length })}</span>
         <span className={`font-mono text-[11px] ml-auto whitespace-pre-line break-words ${msg.kind === "ok" ? "text-signalgreen" : msg.kind === "err" ? "text-signalred" : "text-faint"}`}>{msg.text}</span>
-        <button onClick={start} disabled={enabled.length === 0} className="font-display text-xs uppercase tracking-wide px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber disabled:opacity-40 transition">
-          {t("sequence.start")}
-        </button>
+        {taskId ? (
+          <button onClick={stop} className="font-display text-xs uppercase tracking-wide px-4 py-2 rounded border border-signalred/50 text-signalred bg-signalred/10 hover:bg-signalred/20 transition">
+            {t("common.stop")}
+          </button>
+        ) : (
+          <button onClick={start} disabled={enabled.length === 0} className="font-display text-xs uppercase tracking-wide px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber disabled:opacity-40 transition">
+            {t("sequence.start")}
+          </button>
+        )}
       </div>
     </div>
   );
