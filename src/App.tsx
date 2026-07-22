@@ -72,7 +72,7 @@ function Shell() {
           <span className="font-display font-bold text-[18px] tracking-[0.14em]">
             BIT<span className="text-amber" style={{ textShadow: "0 0 14px rgba(255,178,36,.45)" }}>SENDER</span>
           </span>
-          <span className="font-mono text-[10px] font-semibold text-cyan border border-cyan/35 rounded px-1.5 py-px tracking-wider bg-cyan/[0.08]">v2.0 · TS</span>
+          <span className="font-mono text-[10px] font-semibold text-cyan border border-cyan/35 rounded px-1.5 py-px tracking-wider bg-cyan/[0.08]">v{__APP_VERSION__} · TS</span>
         </div>
         <NicPicker />
         <div className="ml-auto flex items-center gap-1.5">
@@ -124,7 +124,7 @@ function Shell() {
       <footer className="flex items-center gap-[18px] px-4 bg-panel border-t border-line font-mono text-[10px] text-faint tracking-wide">
         <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-signalgreen led" />{t("footer.ready")}</span>
         <span>{t("footer.driver")} <b className="text-dim font-medium">libpcap</b></span>
-        <span className="ml-auto">© BitSender v2</span>
+        <span className="ml-auto">© BitSender v{__APP_VERSION__}</span>
       </footer>
     </div>
   );

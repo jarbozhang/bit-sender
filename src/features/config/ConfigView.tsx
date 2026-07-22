@@ -49,7 +49,7 @@ export function ConfigView() {
         {/* 版本 */}
         <div className={`${card} flex items-center justify-between`}>
           <span className="text-sm text-txt">{L ? "版本" : "Version"}</span>
-          <span className="font-mono text-[12px] text-cyan">v2.0.0 · rewrite</span>
+          <span className="font-mono text-[12px] text-cyan">v{__APP_VERSION__} · rewrite</span>
         </div>
 
         {/* 关于 */}
