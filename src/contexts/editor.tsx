@@ -20,19 +20,29 @@ export function useEditor(): EditorCtx {
   return c;
 }
 
+type Values = Record<string, string | boolean>;
+
 export function EditorProvider({ children }: { children: ReactNode }) {
   const [proto, setProtoState] = useState<ProtoKey>("tcp");
-  const [values, setValues] = useState<Record<string, string | boolean>>(() => defaultValues("tcp"));
+  // 每个协议维护各自的字段值，切 tab 不丢编辑（首次访问才用默认值填充）。
+  const [store, setStore] = useState<Partial<Record<ProtoKey, Values>>>(() => ({
+    tcp: defaultValues("tcp"),
+  }));
+
+  const values = store[proto] ?? defaultValues(proto);
 
   const setProto = (p: ProtoKey) => {
+    setStore((prev) => (prev[p] ? prev : { ...prev, [p]: defaultValues(p) }));
     setProtoState(p);
-    setValues(defaultValues(p));
   };
   const setValue = (k: string, v: string | boolean) =>
-    setValues((prev) => ({ ...prev, [k]: v }));
-  const load = (p: ProtoKey, v: Record<string, string | boolean>) => {
+    setStore((prev) => ({
+      ...prev,
+      [proto]: { ...(prev[proto] ?? defaultValues(proto)), [k]: v },
+    }));
+  const load = (p: ProtoKey, v: Values) => {
+    setStore((prev) => ({ ...prev, [p]: { ...defaultValues(p), ...v } }));
     setProtoState(p);
-    setValues({ ...defaultValues(p), ...v });
   };
 
   return (
