@@ -112,3 +112,11 @@ pnpm release:major      # 0.1.0 -> 1.0.0
 - **macOS 签名**：正式分发需配置 Apple 证书签名与公证。
 
 欢迎提交 issue 和 PR。
+
+## 赞助
+
+感谢赞助者对 BitSender 开发的支持。💛
+
+<a href="https://github.com/tmhenry"><img src="https://github.com/tmhenry.png" width="64" height="64" alt="@tmhenry"></a>
+
+[**@tmhenry**](https://github.com/tmhenry)
