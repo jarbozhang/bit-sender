@@ -147,6 +147,8 @@ const zh: Dict = {
   "sequence.summary": "共 {total} 包 · 启用 {enabled}",
   "sequence.start": "▶ 开始序列",
   "sequence.started": "序列已启动 · 任务 {id}",
+  "sequence.running": "运行中 · 已发 {sent} 包 · 第 {loop}/{loops} 轮",
+  "sequence.done": "序列完成 · 共发 {sent} 包",
   "sequence.pktName": "{proto} 包 {n}",
 
   // 监控
@@ -333,6 +335,8 @@ const en: Dict = {
   "sequence.summary": "{total} packets · {enabled} enabled",
   "sequence.start": "▶ Start Sequence",
   "sequence.started": "Sequence started · task {id}",
+  "sequence.running": "Running · {sent} packets sent · loop {loop}/{loops}",
+  "sequence.done": "Sequence done · {sent} packets sent",
   "sequence.pktName": "{proto} packet {n}",
 
   "monitor.title": "Response Monitor",
