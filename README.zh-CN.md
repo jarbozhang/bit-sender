@@ -6,7 +6,6 @@
 原始 L2 帧由 Rust 强类型构建，经 libpcap（Windows 为 Npcap）直接发送。
 
 > 当前 `main` 为 **v2 全量重写**版本；v1 历史代码保留在 [`legacy/v1`](../../tree/legacy/v1) 分支。
-> 重写背后的故事：[一个周末用 Claude Code 重写 BitSender](./docs/blog/rewriting-bitsender-with-claude.md)。
 
 ---
 

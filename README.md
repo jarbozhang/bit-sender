@@ -11,7 +11,7 @@ Build raw L2 frames field by field, fire them at line rate, and sniff the wire b
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 ![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri%202-24C8B8)
 
-[中文文档](./README.zh-CN.md) · [Download](../../releases/latest) · [The rewrite story](./docs/blog/rewriting-bitsender-with-claude.md)
+[中文文档](./README.zh-CN.md) · [Download](../../releases/latest)
 
 <img src="./docs/demo.gif" alt="BitSender: live layer-colored hex scope, protocol switching, and dark/light themes" width="860">
 
@@ -53,15 +53,6 @@ sudo /Applications/BitSender.app/Contents/MacOS/BitSender
 **Windows** — install [Npcap](https://npcap.com/#download) first (check "WinPcap API compatible mode"). Run as Administrator to send or capture.
 
 **Linux** — needs `libpcap` and the webkit2gtk runtime libs. Run with `sudo` or grant `CAP_NET_RAW`.
-
-## The story: rewritten in a weekend, with receipts
-
-v2 is a full ground-up rewrite, done in one intense session with [Claude Code](https://claude.com/claude-code) (Fable 5 model). The interesting part isn't the speed. It's that this is *not* a vibe-coded toy:
-
-- A strongly-typed `PacketSpec` in Rust is exported to TypeScript by [tauri-specta](https://github.com/specta-rs/tauri-specta), so a field or type mismatch fails at **compile time**. v1's frontend↔backend contract was a `HashMap<String, String>` held together by luck and silent defaults. v2 can't drift.
-- **56 golden-byte tests** assert the exact bytes of every protocol against hand-derived RFC reference frames. Plus Playwright e2e for the UI and green CI on all four platform targets.
-
-Full write-up: [How I rewrote BitSender in a weekend with Claude Code](./docs/blog/rewriting-bitsender-with-claude.md).
 
 ## Development
 
