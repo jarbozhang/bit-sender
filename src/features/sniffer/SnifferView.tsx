@@ -93,7 +93,7 @@ export function SnifferView() {
         )}
       </div>
 
-      {err && <div className="mb-3 font-mono text-[11px] text-signalred">✕ {err}</div>}
+      {err && <div className="mb-3 font-mono text-[11px] text-signalred whitespace-pre-line break-words">✕ {err}</div>}
 
       {/* 统计卡片：pps 是真值（最近完整秒），与列表分离 */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 mb-4">

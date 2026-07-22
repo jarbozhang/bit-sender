@@ -311,9 +311,9 @@ export function PacketEditor() {
                 {t("editor.batch")} ▸
               </button>
             </div>
-            <div className={`mt-3 pt-3 border-t border-line font-mono text-[11px] flex items-center gap-2 ${sendMsg.kind === "ok" ? "text-signalgreen" : sendMsg.kind === "err" ? "text-signalred" : "text-dim"}`}>
+            <div className={`mt-3 pt-3 border-t border-line font-mono text-[11px] flex items-start gap-2 ${sendMsg.kind === "ok" ? "text-signalgreen" : sendMsg.kind === "err" ? "text-signalred" : "text-dim"}`}>
               <span>{sendMsg.kind === "ok" ? "●" : sendMsg.kind === "err" ? "✕" : "○"}</span>
-              <span className="truncate">{sendMsg.kind === "idle" ? t("editor.ready") : sendMsg.text}</span>
+              <span className="whitespace-pre-line break-words">{sendMsg.kind === "idle" ? t("editor.ready") : sendMsg.text}</span>
             </div>
           </div>
         </div>
