@@ -89,3 +89,11 @@ Byte-level correctness is guarded by the cargo golden tests; UI flows by e2e. Re
 ## Contributing
 
 Issues and PRs welcome, especially new protocols and capture/analysis features. See [中文文档](./README.zh-CN.md) for the Chinese version of this README.
+
+## Sponsors
+
+BitSender's development is supported by its sponsors — thank you. 💛
+
+<a href="https://github.com/tmhenry"><img src="https://github.com/tmhenry.png" width="64" height="64" alt="@tmhenry"></a>
+
+[**@tmhenry**](https://github.com/tmhenry)
