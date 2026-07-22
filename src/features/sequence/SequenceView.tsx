@@ -99,7 +99,7 @@ export function SequenceView() {
 
       <div className="flex items-center gap-3 mt-4 pt-4 border-t border-line">
         <span className="font-mono text-[11px] text-dim">{t("sequence.summary", { total: seq.length, enabled: enabled.length })}</span>
-        <span className={`font-mono text-[11px] ml-auto ${msg.kind === "ok" ? "text-signalgreen" : msg.kind === "err" ? "text-signalred" : "text-faint"}`}>{msg.text}</span>
+        <span className={`font-mono text-[11px] ml-auto whitespace-pre-line break-words ${msg.kind === "ok" ? "text-signalgreen" : msg.kind === "err" ? "text-signalred" : "text-faint"}`}>{msg.text}</span>
         <button onClick={start} disabled={enabled.length === 0} className="font-display text-xs uppercase tracking-wide px-4 py-2 rounded border border-amber-dim text-amber bg-amber/10 hover:bg-amber/20 hover:shadow-glow-amber disabled:opacity-40 transition">
           {t("sequence.start")}
         </button>

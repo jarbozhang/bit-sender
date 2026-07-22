@@ -75,7 +75,7 @@ export function MonitorView() {
         <span className="flex-1 h-px" style={{ background: "repeating-linear-gradient(90deg,rgb(var(--line)) 0 6px,transparent 6px 12px)" }} />
       </div>
 
-      {err && <div className="mb-3 font-mono text-[11px] text-signalred">✕ {err}</div>}
+      {err && <div className="mb-3 font-mono text-[11px] text-signalred whitespace-pre-line break-words">✕ {err}</div>}
 
       {/* 配置 */}
       <div className="flex flex-wrap items-end gap-3 mb-4 bg-gradient-to-b from-panel-2 to-panel border border-line rounded p-3.5">

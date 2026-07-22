@@ -88,7 +88,7 @@ export function BatchDialog({ visible, onClose, spec, interfaceName }: Props) {
           <span className="font-mono text-[10px] text-faint ml-auto">{interfaceName ?? t("batch.noNic")}</span>
         </div>
 
-        {error && <div className="mb-3 font-mono text-[11px] text-signalred">✕ {error}</div>}
+        {error && <div className="mb-3 font-mono text-[11px] text-signalred whitespace-pre-line break-words">✕ {error}</div>}
 
         {phase === "setup" && (
           <div className="space-y-3.5">
