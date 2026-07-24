@@ -85,6 +85,7 @@ Issues and PRs welcome, especially new protocols and capture/analysis features. 
 
 BitSender's development is supported by its sponsors — thank you. 💛
 
-<a href="https://github.com/tmhenry"><img src="https://github.com/tmhenry.png" width="64" height="64" alt="@tmhenry"></a>
+<a href="https://github.com/tmhenry"><img src="https://github.com/tmhenry.png" width="64" height="64" alt="tmhenry"></a>
+<img src="./docs/sponsors/zhun.jpg" width="64" height="64" alt="Zhun">
 
-[**@tmhenry**](https://github.com/tmhenry)
+[**@tmhenry**](https://github.com/tmhenry) · **Zhun**
